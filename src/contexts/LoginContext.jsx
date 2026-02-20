@@ -1,5 +1,6 @@
 import { createContext, useEffect, useState } from "react";
 import { fetchProfileEmployee } from "../services/fetchProfileEmployee.js";
+import { logout } from "../services/LogoutApi.js";
 
 
 const initialState = {
@@ -19,8 +20,14 @@ export const LoginProvider = ({ children }) => {
         setError('');
         try {
             const profileData = await fetchProfileEmployee();
-            setProfile(profileData);
-            setIsAuthenticated(true);
+            if (profileData) {
+                setProfile(profileData);
+                setIsAuthenticated(true);
+            } else {
+                setProfile(null);
+                setIsAuthenticated(false);
+            }
+
         } catch (error) {
             setProfile(null);
             setIsAuthenticated(false);
@@ -33,11 +40,25 @@ export const LoginProvider = ({ children }) => {
 
     }, []);
 
+    const logoutEmployee = async () => {
+        setError('');
+        try {
+            await logout();
+            setProfile(null);
+            setIsAuthenticated(false);
+            navigate('/login');
+        } catch (error) {
+            console.error("Logout Error:", error.message);
+            setError(error.message);
+        }
+    }
+
     return (
         <LoginContext.Provider value={{
             isAuthenticated,
             setIsAuthenticated,
             getEmployeeProfile,
+            logoutEmployee,
             profile,
             error,
         }}>
