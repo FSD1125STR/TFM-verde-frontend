@@ -1,11 +1,14 @@
-import { useState } from "react"
+import { useState, useContext } from "react"
 import { useForm } from "react-hook-form"
 import { useNavigate } from "react-router-dom"
 import { login } from '../services/LoginApi.js'
+import { LoginContext } from "../contexts/LoginContext.jsx";
 
 export default function LoginPage() {
 
     const [error, setError] = useState('');
+    const { setIsLogginIn, getEmployeeProfile } = useContext(LoginContext);
+
     const navigate = useNavigate();
 
     const {
@@ -18,10 +21,9 @@ export default function LoginPage() {
         setError('');
         try {
             const responseData = await login(data.email, data.password);
-            console.log('Login successful:', responseData);
+            setIsLogginIn(true)
+            await getEmployeeProfile();
             navigate('/profile');
-
-
         } catch (error) {
             console.error('Error', error.message);
             setError(error.message);
