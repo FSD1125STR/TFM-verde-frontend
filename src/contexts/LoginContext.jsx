@@ -3,7 +3,7 @@ import { fetchProfileEmployee } from "../services/fetchProfileEmployee.js";
 
 
 const initialState = {
-    isLogginIn: false,
+    isAuthenticated: false,
     profile: null
 }
 
@@ -11,7 +11,7 @@ export const LoginContext = createContext(initialState);
 
 export const LoginProvider = ({ children }) => {
 
-    const [isLogginIn, setIsLogginIn] = useState(initialState.isLogginIn);
+    const [isAuthenticated, setIsAuthenticated] = useState(initialState.isAuthenticated);
     const [profile, setProfile] = useState(initialState.profile);
     const [error, setError] = useState('');
 
@@ -20,10 +20,10 @@ export const LoginProvider = ({ children }) => {
         try {
             const profileData = await fetchProfileEmployee();
             setProfile(profileData);
-            setIsLogginIn(true);
+            setIsAuthenticated(true);
         } catch (error) {
             setProfile(null);
-            setIsLogginIn(false);
+            setIsAuthenticated(false);
             setError(error.message);
         }
     }
@@ -35,8 +35,8 @@ export const LoginProvider = ({ children }) => {
 
     return (
         <LoginContext.Provider value={{
-            isLogginIn,
-            setIsLogginIn,
+            isAuthenticated,
+            setIsAuthenticated,
             getEmployeeProfile,
             profile,
             error,
