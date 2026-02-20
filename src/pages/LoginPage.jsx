@@ -7,7 +7,7 @@ import { LoginContext } from "../contexts/LoginContext.jsx";
 export default function LoginPage() {
 
     const [error, setError] = useState('');
-    const { setIsLogginIn, getEmployeeProfile } = useContext(LoginContext);
+    const { setIsAuthenticated, getEmployeeProfile } = useContext(LoginContext);
 
     const navigate = useNavigate();
 
@@ -21,7 +21,7 @@ export default function LoginPage() {
         setError('');
         try {
             const responseData = await login(data.email, data.password);
-            setIsLogginIn(true)
+            setIsAuthenticated(true);
             await getEmployeeProfile();
             navigate('/profile');
         } catch (error) {
