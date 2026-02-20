@@ -18,6 +18,4 @@ export const fetchProfileEmployee = async () => {
     }
 
     return responseData;
-
-
 };   
