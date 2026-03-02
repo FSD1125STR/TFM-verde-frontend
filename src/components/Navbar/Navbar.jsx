@@ -8,12 +8,8 @@ export default function Navbar() {
     const navigate = useNavigate();
 
     const handleLogout = async () => {
-        try {
-            await logoutEmployee();
-            navigate('/login');
-        } catch (error) {
-            console.error("Logout Error:", error.message);
-        }
+        await logoutEmployee();
+        navigate('/login');
     }
 
     return (
