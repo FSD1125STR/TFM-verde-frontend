@@ -2,20 +2,27 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
 import Navbar from './components/Navbar/Navbar'
-import LoginCompanyPage from './pages/LoginCompanyPage'
+import LoginPage from './pages/LoginPage'
+import ProfilePage from './pages/ProfilePage'
+import DesignSystem from './pages/DesignSystem'
+import { LoginProvider } from './contexts/LoginContext'
 
 function App() {
 
   return (
     <>
-      <BrowserRouter>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path='/login-company' element={<LoginCompanyPage />} />
-        </Routes>
-      </BrowserRouter>
+      <LoginProvider>
+        <BrowserRouter>
+          <Navbar />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path='/login' element={<LoginPage />} />
+            <Route path='/profile' element={<ProfilePage />} />
+            <Route path='/design-system' element={<DesignSystem />} />
+          </Routes>
+        </BrowserRouter>
+      </LoginProvider>
     </>
   )
 }
