@@ -1,13 +1,15 @@
-import instance from './axios';
+const API_BASE_URL = 'http://localhost:4000/api';
 
 //get all images
 const getImages = async () => {
   try {
-    const res = await instance.get(
-      'http://localhost:4000/api/cloudinary/images',
-    );
+    const res = await fetch(`${API_BASE_URL}/cloudinary/images`);
 
-    return res.data;
+    if (!res.ok) {
+      throw new Error('Error fetching images');
+    }
+
+    return await res.json();
   } catch (err) {
     console.error('Fetch images error', err);
   }
@@ -20,22 +22,22 @@ const uploadImage = async (file) => {
   fd.append('file', file);
 
   try {
-    const res = await instance.post(
-      'http://localhost:4000/api/cloudinary/upload',
-      fd,
-      {
-        // onUploadProgress: (event) => {
-        //   console.log('this is the event on upload progress', event);
-        //   const percent = Math.round((event.loaded * 100) / event.total);
-        //   setProgress(percent);
-        // },
-      },
-    );
+    const res = await fetch(`${API_BASE_URL}/cloudinary/upload`, {
+      method: 'POST',
+      body: fd,
+      // Note: FormData automatically sets the correct Content-Type header
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Upload failed');
+    }
+
     // get URL attribute from the object returned by the backend
-    return res;
+    return await res.json();
   } catch (err) {
     console.error(err);
-    alert('Upload failed: ' + (err.response?.data?.error || err.message));
+    alert('Upload failed: ' + err.message);
   }
 };
 
@@ -43,9 +45,15 @@ const uploadImage = async (file) => {
 const deleteImage = async (public_id) => {
   if (!window.confirm('Delete this image?')) return;
   try {
-    await instance.delete(
-      `http://localhost:4000/api/images/${public_id.replace('Nuclio/cars/', '')}`,
+    const res = await fetch(
+      `${API_BASE_URL}/images/${public_id.replace('Nuclio/cars/', '')}`,
+      { method: 'DELETE' },
     );
+
+    if (!res.ok) {
+      throw new Error('Delete failed');
+    }
+
     // // remove locally
     // setImages((prev) => prev.filter((img) => img.public_id !== public_id));
     // re-fetch to sync with Cloudinary
