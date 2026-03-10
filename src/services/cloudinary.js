@@ -1,9 +1,19 @@
 const API_BASE_URL = 'http://localhost:4000/api';
 
-//get all images
-const getImages = async () => {
+const FOLDERS = {
+  CARS: 'cars',
+  PROFILES: 'profiles',
+  BRANDS: 'brands',
+};
+
+// Get all images by folder
+const getImages = async (folder) => {
   try {
-    const res = await fetch(`${API_BASE_URL}/cloudinary/images`);
+    if (!FOLDERS[folder]) {
+      throw new Error(`Invalid folder: ${folder}`);
+    }
+
+    const res = await fetch(`${API_BASE_URL}/cloudinary/images/${folder}`);
 
     if (!res.ok) {
       throw new Error('Error fetching images');
@@ -15,17 +25,21 @@ const getImages = async () => {
   }
 };
 
-//uploadImage file param
-const uploadImage = async (file) => {
+// Upload image to specified folder
+const uploadImage = async (file, folder) => {
   if (!file) return alert('Choose a file first');
+
+  if (!FOLDERS[folder]) {
+    return alert(`Invalid folder: ${folder}`);
+  }
+
   const fd = new FormData();
   fd.append('file', file);
 
   try {
-    const res = await fetch(`${API_BASE_URL}/cloudinary/upload`, {
+    const res = await fetch(`${API_BASE_URL}/cloudinary/upload/${folder}`, {
       method: 'POST',
       body: fd,
-      // Note: FormData automatically sets the correct Content-Type header
     });
 
     if (!res.ok) {
@@ -41,12 +55,16 @@ const uploadImage = async (file) => {
   }
 };
 
-//delete image by id
-const deleteImage = async (public_id) => {
+// Delete image by public_id
+const deleteImage = async (public_id, folder) => {
+  if (!FOLDERS[folder]) {
+    return alert(`Invalid folder: ${folder}`);
+  }
+
   if (!window.confirm('Delete this image?')) return;
   try {
     const res = await fetch(
-      `${API_BASE_URL}/images/${public_id.replace('Nuclio/cars/', '')}`,
+      `${API_BASE_URL}/images/${public_id.replace(`Nuclio/${folder}/`, '')}`,
       { method: 'DELETE' },
     );
 
@@ -54,14 +72,12 @@ const deleteImage = async (public_id) => {
       throw new Error('Delete failed');
     }
 
-    // // remove locally
-    // setImages((prev) => prev.filter((img) => img.public_id !== public_id));
     // re-fetch to sync with Cloudinary
-    return getImages();
+    return getImages(folder);
   } catch (err) {
     console.error('Delete failed', err);
     alert('Delete failed');
   }
 };
 
-export default { getImages, uploadImage, deleteImage };
+export { FOLDERS, getImages, uploadImage, deleteImage };
