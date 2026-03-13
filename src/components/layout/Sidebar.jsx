@@ -27,7 +27,7 @@ export default function Sidebar() {
             {/* Logo */}
             <div className="flex items-center gap-4 mb-8">
             <div className="w-12 h-12 rounded-2xl bg-primary text-white flex items-center justify-center shadow">
-                🚗
+                🛠️
             </div>
 
             <div>
