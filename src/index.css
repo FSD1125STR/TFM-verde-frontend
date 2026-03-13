@@ -1,2 +1,35 @@
 @import "tailwindcss";
-@plugin "daisyui";
+
+@plugin "daisyui" {
+  themes: mechanicmanager --default;
+}
+
+@plugin "daisyui/theme" {
+  name: "mechanicmanager";
+
+  --color-primary: #2563EB;
+  --color-secondary: #C4D4E8;
+  --color-accent: #D7CFE3;
+
+  --color-neutral: #0F1B2E;
+
+  --color-base-100: #FFFFFF;
+  --color-base-200: #F3F4F6;
+
+  --color-success: #A7D6BF;
+  --color-warning: #EFDCC5;
+  --color-error: #EF4444;
+  --color-info: #C4D4E8;
+  --rounded-btn: 1rem;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+}
