@@ -5,5 +5,5 @@ const initialState = {
   profile: null,
 };
 
-export const LoginContext = createContext(initialState);
+export const LoginContext = createContext(null);
 export { initialState };
