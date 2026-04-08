@@ -9,21 +9,23 @@ import VehicleReceptionPage from "./pages/VehicleReceptionPage";
 import ClientInfoPage from "./pages/ClientInfoPage";
 import VehicleStatusPage from "./pages/VehicleStatusPage";
 import VehicleSignaturePage from "./pages/VehicleSignaturePage";
+import EmployeePage from "./pages/EmployeePage";
 import AppLayout from "./components/layout/AppLayout";
 import { LoginProvider } from "./contexts/LoginContext.jsx";
+import WorkOrdersPage from "./pages/WorkOrdersPage";
 
 function App() {
   return (
     <LoginProvider>
       <BrowserRouter>
         <Routes>
-          {/* Rutas públicas */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
 
-          {/* Rutas con layout */}
           <Route element={<AppLayout />}>
+            <Route path="/work-orders" element={<WorkOrdersPage />} />
             <Route path="/" element={<HomePage />} />
+            <Route path="/employees" element={<EmployeePage />} />
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/vehicle-reception" element={<VehicleReceptionPage />} />
