@@ -6,7 +6,9 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import DesignSystem from "./pages/DesignSystem";
 import VehicleReceptionPage from "./pages/VehicleReceptionPage";
-
+import ClientInfoPage from "./pages/ClientInfoPage";
+import VehicleStatusPage from "./pages/VehicleStatusPage";
+import VehicleSignaturePage from "./pages/VehicleSignaturePage";
 import AppLayout from "./components/layout/AppLayout";
 import { LoginProvider } from "./contexts/LoginContext.jsx";
 
@@ -25,6 +27,9 @@ function App() {
             <Route path="/profile" element={<ProfilePage />} />
             <Route path="/design-system" element={<DesignSystem />} />
             <Route path="/vehicle-reception" element={<VehicleReceptionPage />} />
+            <Route path="/client-info" element={<ClientInfoPage />} />
+            <Route path="/vehicle-status" element={<VehicleStatusPage />} />
+            <Route path="/vehicle-signature" element={<VehicleSignaturePage />} />
           </Route>
         </Routes>
       </BrowserRouter>
