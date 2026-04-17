@@ -73,7 +73,6 @@ const deleteImage = async (public_id, folder) => {
     }
 
     // re-fetch to sync with Cloudinary
-    return getImages(folder);
   } catch (err) {
     console.error('Delete failed', err);
     alert('Delete failed');
