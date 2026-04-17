@@ -1,0 +1,141 @@
+.container {
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 800px;
+  height: 600px;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.room {
+  margin: 0;
+  color: #333;
+  font-size: 20px;
+}
+
+.username {
+  margin: 5px 0 0;
+  color: #666;
+  font-size: 14px;
+}
+
+.leaveButton {
+  padding: 8px 16px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.3s;
+}
+
+.leaveButton:hover {
+  background: #d32f2f;
+}
+
+.messagesContainer {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.systemMessage {
+  text-align: center;
+  padding: 8px;
+}
+
+.systemText {
+  color: #999;
+  font-size: 14px;
+  font-style: italic;
+}
+
+.myMessage,
+.otherMessage {
+  padding: 10px 15px;
+  border-radius: 8px;
+  max-width: 70%;
+  word-wrap: break-word;
+}
+
+.myMessage {
+  align-self: flex-end;
+  background: #4caf50;
+  color: white;
+}
+
+.otherMessage {
+  align-self: flex-start;
+  background: #e0e0e0;
+  color: #333;
+}
+
+.messageUsername {
+  display: block;
+  font-weight: bold;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.myMessage .messageUsername {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.otherMessage .messageUsername {
+  color: #666;
+}
+
+.messageText {
+  display: block;
+  font-size: 14px;
+}
+
+.inputForm {
+  padding: 20px;
+  border-top: 1px solid #eee;
+  display: flex;
+  gap: 10px;
+}
+
+.input {
+  flex: 1;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.sendButton {
+  padding: 12px 24px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.sendButton:hover {
+  background: #45a049;
+}
