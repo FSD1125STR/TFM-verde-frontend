@@ -1,4 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Button from "../components/ui/Button";
+import Input from "../components/ui/Input";
+import Select from "../components/ui/Select";
+import Modal from "../components/ui/Modal";
+import PageHeader from "../components/ui/PageHeader";
+import Card from "../components/ui/Card";
+import { getRoles } from "../services/roleApi";
 
 const initialEmployees = [];
 
@@ -33,6 +40,10 @@ function getStatusBadge(status) {
 
 export default function EmployeePage() {
   const [employees, setEmployees] = useState(initialEmployees);
+  const [roles, setRoles] = useState([]);
+  const [rolesLoading, setRolesLoading] = useState(true);
+  const [rolesError, setRolesError] = useState("");
+
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("Todos");
   const [statusFilter, setStatusFilter] = useState("Todos");
@@ -41,8 +52,33 @@ export default function EmployeePage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    role: "Recepcionista",
+    role: "",
   });
+
+  useEffect(() => {
+    const fetchRoles = async () => {
+      setRolesLoading(true);
+      setRolesError("");
+
+      try {
+        const data = await getRoles();
+        setRoles(data);
+
+        if (data.length > 0) {
+          setFormData((prev) => ({
+            ...prev,
+            role: data[0],
+          }));
+        }
+      } catch (error) {
+        setRolesError(error.message);
+      } finally {
+        setRolesLoading(false);
+      }
+    };
+
+    fetchRoles();
+  }, []);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter((employee) => {
@@ -67,7 +103,7 @@ export default function EmployeePage() {
     setFormData({
       name: "",
       email: "",
-      role: "Recepcionista",
+      role: roles.length > 0 ? roles[0] : "",
     });
   };
 
@@ -86,7 +122,7 @@ export default function EmployeePage() {
     if (!formData.name.trim() || !formData.email.trim() || !formData.role) {
       return;
     }
-    // modificar por endpoint real de backend
+
     const newEmployee = {
       id: Date.now(),
       name: formData.name.trim(),
@@ -103,59 +139,55 @@ export default function EmployeePage() {
     setEmployees((prev) => prev.filter((employee) => employee.id !== id));
   };
 
+  const roleOptions = roles.map((role) => ({
+    value: role,
+    label: role,
+  }));
+
+  const filterRoleOptions = [
+    { value: "Todos", label: "Todos los Roles" },
+    ...roleOptions,
+  ];
+
   return (
     <>
       <section className="max-w-6xl space-y-6 text-white">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Gestión de Empleados</h1>
-            <p className="text-white/60">
-              Administra el personal del taller y sus permisos.
-            </p>
-          </div>
+        <PageHeader
+          title="Gestión de Empleados"
+          description="Administra el personal del taller y sus permisos."
+          action={<Button onClick={openModal}>Añadir Empleado</Button>}
+        />
 
-          <button
-            onClick={openModal}
-            className="bg-blue-600 hover:bg-blue-700 px-5 py-3 rounded-xl font-medium"
-          >
-            Añadir Empleado
-          </button>
-        </div>
-
-        <div className="bg-[#111827] rounded-2xl border border-white/10 p-4 space-y-4">
+        <Card className="p-4 space-y-4">
           <div className="flex flex-col gap-3 lg:flex-row">
-            <input
-              type="text"
+            <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar por nombre o correo..."
-              className="bg-[#1F2937] p-3 rounded-xl w-full outline-none"
+              className="border-0"
             />
 
-            <select
+            <Select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-[#1F2937] px-4 py-3 rounded-xl outline-none lg:w-52"
-            >
-              <option value="Todos">Todos los Roles</option>
-              <option value="Admin">Admin</option>
-              <option value="Recepcionista">Recepcionista</option>
-              <option value="Mecánico">Mecánico</option>
-            </select>
+              options={filterRoleOptions}
+              className="border-0 lg:w-52"
+            />
 
-            <select
+            <Select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-[#1F2937] px-4 py-3 rounded-xl outline-none lg:w-52"
-            >
-              <option value="Todos">Todos los Estados</option>
-              <option value="Activo">Activo</option>
-              <option value="Inactivo">Inactivo</option>
-            </select>
+              options={[
+                { value: "Todos", label: "Todos los Estados" },
+                { value: "Activo", label: "Activo" },
+                { value: "Inactivo", label: "Inactivo" },
+              ]}
+              className="border-0 lg:w-52"
+            />
           </div>
-        </div>
+        </Card>
 
-        <div className="overflow-hidden rounded-2xl border border-white/10 bg-[#111827]">
+        <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-white/5 text-white/60 uppercase text-xs">
@@ -211,113 +243,72 @@ export default function EmployeePage() {
                         </span>
                       </td>
 
-                      <td className="px-6 py-4">
-                        <div className="flex justify-end">
-                          <button
-                            onClick={() => handleDeleteEmployee(employee.id)}
-                            className="text-white/50 hover:text-red-400 transition"
-                          >
-                            Eliminar
-                          </button>
-                        </div>
+                      <td className="px-6 py-4 text-right">
+                        <Button
+                          variant="ghost"
+                          onClick={() => handleDeleteEmployee(employee.id)}
+                        >
+                          Eliminar
+                        </Button>
                       </td>
                     </tr>
                   ))
                 ) : (
-                  <tr className="border-t border-white/5">
-                    <td
-                      colSpan="4"
-                      className="px-6 py-10 text-center text-white/50"
-                    >
-                      No hay empleados registrados.
+                  <tr>
+                    <td colSpan="4" className="text-center py-10 text-white/50">
+                      No hay empleados
                     </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       </section>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[#0F172A] shadow-2xl">
-            <div className="flex items-center justify-between border-b border-white/10 px-6 py-5">
-              <h2 className="text-2xl font-bold text-white">Nuevo Empleado</h2>
+      <Modal
+        isOpen={isModalOpen}
+        title="Nuevo Empleado"
+        onClose={closeModal}
+      >
+        <form onSubmit={handleAddEmployee} className="space-y-5">
+          <Input
+            label="Nombre completo"
+            name="name"
+            value={formData.name}
+            onChange={handleChange}
+          />
 
-              <button
-                onClick={closeModal}
-                className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/70"
-              >
-                ✕
-              </button>
-            </div>
+          <Input
+            label="Email corporativo"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+          />
 
-            <form onSubmit={handleAddEmployee} className="px-6 py-6">
-              <div className="space-y-5">
-                <div>
-                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40">
-                    Nombre completo
-                  </label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={formData.name}
-                    onChange={handleChange}
-                    className="w-full rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5"
-                  />
-                </div>
+          {rolesLoading ? (
+            <p className="text-sm text-white/50">Cargando roles...</p>
+          ) : rolesError ? (
+            <p className="text-sm text-red-400">{rolesError}</p>
+          ) : (
+            <Select
+              label="Rol"
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              options={roleOptions}
+            />
+          )}
 
-                <div>
-                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40">
-                    Email corporativo
-                  </label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={handleChange}
-                    className="w-full rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5"
-                  />
-                </div>
+          <div className="flex gap-3">
+            <Button type="button" variant="secondary" onClick={closeModal}>
+              Cancelar
+            </Button>
 
-                <div>
-                  <label className="mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40">
-                    Rol en el taller
-                  </label>
-                  <select
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5"
-                  >
-                    <option value="Recepcionista">Recepcionista</option>
-                    <option value="Mecánico">Mecánico</option>
-                    <option value="Admin">Admin</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="mt-8 flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeModal}
-                  className="flex-1 rounded-2xl border border-white/10 px-4 py-3 text-white/80 hover:bg-white/5"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 rounded-2xl bg-blue-600 px-4 py-3 font-medium text-white hover:bg-blue-700"
-                >
-                  Guardar Empleado
-                </button>
-              </div>
-            </form>
+            <Button type="submit">Guardar</Button>
           </div>
-        </div>
-      )}
+        </form>
+      </Modal>
     </>
   );
 }

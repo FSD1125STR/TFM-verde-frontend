@@ -2,7 +2,7 @@ import { useState, useContext } from "react"
 import { useForm } from "react-hook-form"
 import { useNavigate } from "react-router-dom"
 import { login } from '../services/LoginApi.js'
-import { LoginContext } from "../contexts/LoginContext.jsx";
+import { LoginContext } from "../contexts/AuthContext.js";
 
 export default function LoginPage() {
 

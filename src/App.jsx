@@ -16,8 +16,8 @@ import WorkOrdersPage from "./pages/WorkOrdersPage";
 
 function App() {
   return (
-    <LoginProvider>
-      <BrowserRouter>
+    <BrowserRouter>
+      <LoginProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -34,8 +34,8 @@ function App() {
             <Route path="/vehicle-signature" element={<VehicleSignaturePage />} />
           </Route>
         </Routes>
-      </BrowserRouter>
-    </LoginProvider>
+      </LoginProvider>
+    </BrowserRouter>
   );
 }
 
