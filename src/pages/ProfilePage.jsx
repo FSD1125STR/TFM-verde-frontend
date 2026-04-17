@@ -1,8 +1,8 @@
 import { useContext } from 'react';
-import { LoginContext } from '../contexts/LoginContext.jsx';
+import { LoginProvider } from '../contexts/LoginProvider.jsx';
 
 export default function ProfilePage() {
-  const { profile, error } = useContext(LoginContext);
+  const { profile, error } = useContext(LoginProvider);
   const { _id, email, cif, password, type } = profile.employee;
 
   return (
