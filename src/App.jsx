@@ -1,28 +1,47 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
 import HomePage from './pages/HomePage';
 import RegisterPage from './pages/RegisterPage';
-import Navbar from './components/Navbar/Navbar';
 import LoginPage from './pages/LoginPage';
 import ProfilePage from './pages/ProfilePage';
 import DesignSystem from './pages/DesignSystem';
-import { LoginProvider } from './contexts/LoginProvider';
+import VehicleReceptionPage from './pages/VehicleReceptionPage';
+import ClientInfoPage from './pages/ClientInfoPage';
+import VehicleStatusPage from './pages/VehicleStatusPage';
+import VehicleSignaturePage from './pages/VehicleSignaturePage';
+import EmployeePage from './pages/EmployeePage';
+import AppLayout from './components/layout/AppLayout';
+import { LoginProvider } from './contexts/LoginProvider.jsx';
+import WorkOrdersPage from './pages/WorkOrdersPage';
 
 function App() {
   return (
-    <>
+    <BrowserRouter>
       <LoginProvider>
-        <BrowserRouter>
-          <Navbar />
-          <Routes>
+        <Routes>
+          <Route path='/login' element={<LoginPage />} />
+          <Route path='/register' element={<RegisterPage />} />
+
+          <Route element={<AppLayout />}>
+            <Route path='/work-orders' element={<WorkOrdersPage />} />
             <Route path='/' element={<HomePage />} />
-            <Route path='/register' element={<RegisterPage />} />
-            <Route path='/login' element={<LoginPage />} />
+            <Route path='/employees' element={<EmployeePage />} />
             <Route path='/profile' element={<ProfilePage />} />
             <Route path='/design-system' element={<DesignSystem />} />
-          </Routes>
-        </BrowserRouter>
+            <Route
+              path='/vehicle-reception'
+              element={<VehicleReceptionPage />}
+            />
+            <Route path='/client-info' element={<ClientInfoPage />} />
+            <Route path='/vehicle-status' element={<VehicleStatusPage />} />
+            <Route
+              path='/vehicle-signature'
+              element={<VehicleSignaturePage />}
+            />
+          </Route>
+        </Routes>
       </LoginProvider>
-    </>
+    </BrowserRouter>
   );
 }
 
