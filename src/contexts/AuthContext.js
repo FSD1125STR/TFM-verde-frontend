@@ -1,9 +1,11 @@
-import { createContext } from 'react';
+import { createContext } from "react";
 
-const initialState = {
+export const initialState = {
   isAuthenticated: false,
   profile: null,
+  setIsAuthenticated: () => {},
+  getEmployeeProfile: async () => {},
+  logoutEmployee: async () => {},
 };
 
-export const LoginContext = createContext(null);
-export { initialState };
+export const LoginContext = createContext(initialState);
