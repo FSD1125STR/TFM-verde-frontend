@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
@@ -6,8 +6,13 @@ import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import { getRoles } from '../services/roleApi';
-
-const initialEmployees = [];
+import { LoginContext } from '../contexts/AuthContext';
+import {
+  createEmployee,
+  deleteEmployee,
+  getEmployees,
+  updateEmployee,
+} from '../services/employeeApi';
 
 function getInitials(name) {
   return name
@@ -21,10 +26,14 @@ function getInitials(name) {
 
 function getRoleBadge(role) {
   switch (role) {
+    case 'ADMIN':
     case 'Admin':
       return 'bg-purple-500/20 text-purple-300';
+    case 'RECEPCIONISTA':
     case 'Recepcionista':
       return 'bg-blue-500/20 text-blue-300';
+    case 'MECANICO':
+    case 'MECÁNICO':
     case 'Mecánico':
       return 'bg-orange-500/20 text-orange-300';
     default:
@@ -39,10 +48,18 @@ function getStatusBadge(status) {
 }
 
 export default function EmployeePage() {
-  const [employees, setEmployees] = useState(initialEmployees);
+  const { profile } = useContext(LoginContext);
+
+  const [employees, setEmployees] = useState([]);
+  const [employeesLoading, setEmployeesLoading] = useState(true);
+  const [employeesError, setEmployeesError] = useState('');
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState('');
+  const [submitError, setSubmitError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
+  const [editingEmployee, setEditingEmployee] = useState(null);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
@@ -51,11 +68,27 @@ export default function EmployeePage() {
 
   const [formData, setFormData] = useState({
     name: '',
+    lastname: '',
     email: '',
+    password: '',
     role: '',
   });
 
   useEffect(() => {
+    const fetchEmployees = async () => {
+      setEmployeesLoading(true);
+      setEmployeesError('');
+
+      try {
+        const data = await getEmployees();
+        setEmployees(data);
+      } catch (error) {
+        setEmployeesError(error.message);
+      } finally {
+        setEmployeesLoading(false);
+      }
+    };
+
     const fetchRoles = async () => {
       setRolesLoading(true);
       setRolesError('');
@@ -77,6 +110,7 @@ export default function EmployeePage() {
       }
     };
 
+    fetchEmployees();
     fetchRoles();
   }, []);
 
@@ -87,7 +121,7 @@ export default function EmployeePage() {
         employee.email.toLowerCase().includes(search.toLowerCase());
 
       const matchesRole =
-        roleFilter === 'Todos' || employee.role === roleFilter;
+        roleFilter === 'Todos' || employee.rol === roleFilter;
 
       const matchesStatus =
         statusFilter === 'Todos' || employee.status === statusFilter;
@@ -96,13 +130,41 @@ export default function EmployeePage() {
     });
   }, [employees, search, roleFilter, statusFilter]);
 
-  const openModal = () => setIsModalOpen(true);
+  const openCreateModal = () => {
+    setEditingEmployee(null);
+    setIsModalOpen(true);
+    setSubmitError('');
+    setFormData({
+      name: '',
+      lastname: '',
+      email: '',
+      password: '',
+      role: roles.length > 0 ? roles[0] : '',
+    });
+  };
+
+  const openEditModal = (employee) => {
+    setEditingEmployee(employee);
+    setIsModalOpen(true);
+    setSubmitError('');
+    setFormData({
+      name: employee.name ?? '',
+      lastname: employee.lastname ?? '',
+      email: employee.email ?? '',
+      password: '',
+      role: employee.rol ?? (roles.length > 0 ? roles[0] : ''),
+    });
+  };
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setEditingEmployee(null);
+    setSubmitError('');
     setFormData({
       name: '',
+      lastname: '',
       email: '',
+      password: '',
       role: roles.length > 0 ? roles[0] : '',
     });
   };
@@ -116,27 +178,71 @@ export default function EmployeePage() {
     }));
   };
 
-  const handleAddEmployee = (e) => {
+  const handleSubmitEmployee = async (e) => {
     e.preventDefault();
+    setSubmitError('');
 
-    if (!formData.name.trim() || !formData.email.trim() || !formData.role) {
+    if (
+      !formData.name.trim() ||
+      !formData.lastname.trim() ||
+      !formData.email.trim() ||
+      (!editingEmployee && !formData.password.trim()) ||
+      !formData.role
+    ) {
       return;
     }
 
-    const newEmployee = {
-      id: Date.now(),
-      name: formData.name.trim(),
-      email: formData.email.trim(),
-      role: formData.role,
-      status: 'Activo',
-    };
+    setIsSubmitting(true);
 
-    setEmployees((prev) => [...prev, newEmployee]);
-    closeModal();
+    try {
+      const payload = {
+        name: formData.name.trim(),
+        lastname: formData.lastname.trim(),
+        email: formData.email.trim(),
+        rol: formData.role,
+      };
+
+      if (formData.password.trim()) {
+        payload.password = formData.password;
+      }
+
+      if (editingEmployee) {
+        const updatedEmployee = await updateEmployee(editingEmployee._id, payload);
+
+        setEmployees((prev) =>
+          prev.map((employee) =>
+            employee._id === editingEmployee._id ? updatedEmployee : employee,
+          ),
+        );
+      } else {
+        const newEmployee = await createEmployee({
+          ...payload,
+          type: 'EMPLOYEE',
+          password: formData.password,
+        });
+
+        setEmployees((prev) => [...prev, newEmployee]);
+      }
+
+      closeModal();
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleDeleteEmployee = (id) => {
-    setEmployees((prev) => prev.filter((employee) => employee.id !== id));
+  const handleDeleteEmployee = async (id) => {
+    setDeletingEmployeeId(id);
+
+    try {
+      await deleteEmployee(id);
+      setEmployees((prev) => prev.filter((employee) => employee._id !== id));
+    } catch (error) {
+      setEmployeesError(error.message);
+    } finally {
+      setDeletingEmployeeId(null);
+    }
   };
 
   const roleOptions = roles.map((role) => ({
@@ -155,10 +261,18 @@ export default function EmployeePage() {
         <PageHeader
           title='Gestión de Empleados'
           description='Administra el personal del taller y sus permisos.'
-          action={<Button onClick={openModal}>Añadir Empleado</Button>}
+          action={
+            profile.employee.rol === 'ADMIN' ? (
+              <Button onClick={openCreateModal}>Añadir Empleado</Button>
+            ) : null
+          }
         />
 
         <Card className='p-4 space-y-4'>
+          {employeesError ? (
+            <p className='text-sm text-red-400'>{employeesError}</p>
+          ) : null}
+
           <div className='flex flex-col gap-3 lg:flex-row'>
             <Input
               value={search}
@@ -200,10 +314,16 @@ export default function EmployeePage() {
               </thead>
 
               <tbody>
-                {filteredEmployees.length > 0 ? (
+                {employeesLoading ? (
+                  <tr>
+                    <td colSpan='4' className='text-center py-10 text-white/50'>
+                      Cargando empleados...
+                    </td>
+                  </tr>
+                ) : filteredEmployees.length > 0 ? (
                   filteredEmployees.map((employee) => (
                     <tr
-                      key={employee.id}
+                      key={employee._id}
                       className='border-t border-white/5 hover:bg-white/2'
                     >
                       <td className='px-6 py-4'>
@@ -214,7 +334,7 @@ export default function EmployeePage() {
 
                           <div>
                             <p className='font-medium text-white'>
-                              {employee.name}
+                              {employee.name} {employee.lastname}
                             </p>
                             <p className='text-white/50 text-xs'>
                               {employee.email}
@@ -226,30 +346,43 @@ export default function EmployeePage() {
                       <td className='px-6 py-4'>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${getRoleBadge(
-                            employee.role,
+                            employee.rol,
                           )}`}
                         >
-                          {employee.role}
+                          {employee.rol}
                         </span>
                       </td>
 
                       <td className='px-6 py-4'>
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadge(
-                            employee.status,
+                            employee.status || 'Activo',
                           )}`}
                         >
-                          {employee.status}
+                          {employee.status || 'Activo'}
                         </span>
                       </td>
 
                       <td className='px-6 py-4 text-right'>
-                        <Button
-                          variant='ghost'
-                          onClick={() => handleDeleteEmployee(employee.id)}
-                        >
-                          Eliminar
-                        </Button>
+                        {profile.employee.rol === 'ADMIN' ? (
+                          <div className='flex justify-end gap-2'>
+                            <Button
+                              variant='secondary'
+                              onClick={() => openEditModal(employee)}
+                            >
+                              Editar
+                            </Button>
+
+                            <Button
+                              variant='ghost'
+                              onClick={() => handleDeleteEmployee(employee._id)}
+                            >
+                              {deletingEmployeeId === employee._id
+                                ? 'Eliminando...'
+                                : 'Eliminar'}
+                            </Button>
+                          </div>
+                        ) : null}
                       </td>
                     </tr>
                   ))
@@ -266,12 +399,27 @@ export default function EmployeePage() {
         </Card>
       </section>
 
-      <Modal isOpen={isModalOpen} title='Nuevo Empleado' onClose={closeModal}>
-        <form onSubmit={handleAddEmployee} className='space-y-5'>
+      <Modal
+        isOpen={isModalOpen}
+        title={editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}
+        onClose={closeModal}
+      >
+        <form onSubmit={handleSubmitEmployee} className='space-y-5'>
+          {submitError ? (
+            <p className='text-sm text-red-400'>{submitError}</p>
+          ) : null}
+
           <Input
-            label='Nombre completo'
+            label='Nombre'
             name='name'
             value={formData.name}
+            onChange={handleChange}
+          />
+
+          <Input
+            label='Apellidos'
+            name='lastname'
+            value={formData.lastname}
             onChange={handleChange}
           />
 
@@ -280,6 +428,21 @@ export default function EmployeePage() {
             name='email'
             value={formData.email}
             onChange={handleChange}
+          />
+
+          <Input
+            label={
+              editingEmployee
+                ? 'Nueva contraseña'
+                : 'Contraseña'
+            }
+            type='password'
+            name='password'
+            value={formData.password}
+            onChange={handleChange}
+            placeholder={
+              editingEmployee ? 'Déjalo vacío para mantener la actual' : ''
+            }
           />
 
           {rolesLoading ? (
@@ -301,7 +464,13 @@ export default function EmployeePage() {
               Cancelar
             </Button>
 
-            <Button type='submit'>Guardar</Button>
+            <Button type='submit'>
+              {isSubmitting
+                ? 'Guardando...'
+                : editingEmployee
+                  ? 'Actualizar'
+                  : 'Guardar'}
+            </Button>
           </div>
         </form>
       </Modal>
