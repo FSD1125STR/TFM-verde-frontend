@@ -11,6 +11,8 @@ export default function Sidebar() {
   const menuItems = [
     { label: "Panel Control", path: "/" },
     { label: "Empleados", path: "/employees" },
+    { label: "Clientes", path: "/customers" },
+    { label: "Vehículos", path: "/vehicles" },
     { label: "Recepción Vehículo", path: "/vehicle-reception" },
     { label: "Órdenes de Trabajo", path: "/work-orders" },
     { label: "Chat", path: "/chat" },

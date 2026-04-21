@@ -7,10 +7,11 @@ import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
 import DesignSystem from "./pages/DesignSystem";
 import VehicleReceptionPage from "./pages/VehicleReceptionPage";
-import ClientInfoPage from "./pages/ClientInfoPage";
 import VehicleStatusPage from "./pages/VehicleStatusPage";
 import VehicleSignaturePage from "./pages/VehicleSignaturePage";
+import VehiclesPage from "./pages/VehiclesPage";
 import EmployeePage from "./pages/EmployeePage";
+import CustomersPage from "./pages/CustomersPage";
 import WorkOrdersPage from "./pages/WorkOrdersPage";
 import ChatPage from "./pages/ChatPage";
 import AppLayout from "./components/layout/AppLayout";
@@ -35,8 +36,9 @@ function AppRoutes() {
       >
         <Route index element={<HomePage />} />
         <Route path="employees" element={<EmployeePage />} />
+        <Route path="customers" element={<CustomersPage />} />
+        <Route path="vehicles" element={<VehiclesPage />} />
         <Route path="vehicle-reception" element={<VehicleReceptionPage />} />
-        <Route path="client-info" element={<ClientInfoPage />} />
         <Route path="vehicle-status" element={<VehicleStatusPage />} />
         <Route path="vehicle-signature" element={<VehicleSignaturePage />} />
         <Route path="work-orders" element={<WorkOrdersPage />} />
