@@ -1,9 +1,12 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
 const FOLDERS = {
   CARS: 'cars',
   PROFILES: 'profiles',
   BRANDS: 'brands',
+  VEHICLE_RECEPTION: 'vehicle-reception',
+  VEHICLE_SIGNATURES: 'vehicle-signatures',
 };
 
 // Get all images by folder
@@ -27,10 +30,12 @@ const getImages = async (folder) => {
 
 // Upload image to specified folder
 const uploadImage = async (file, folder) => {
-  if (!file) return alert('Choose a file first');
+  if (!file) {
+    throw new Error('Choose a file first');
+  }
 
   if (!FOLDERS[folder]) {
-    return alert(`Invalid folder: ${folder}`);
+    throw new Error(`Invalid folder: ${folder}`);
   }
 
   const fd = new FormData();
@@ -51,20 +56,20 @@ const uploadImage = async (file, folder) => {
     return await res.json();
   } catch (err) {
     console.error(err);
-    alert('Upload failed: ' + err.message);
+    throw err;
   }
 };
 
 // Delete image by public_id
 const deleteImage = async (public_id, folder) => {
   if (!FOLDERS[folder]) {
-    return alert(`Invalid folder: ${folder}`);
+    throw new Error(`Invalid folder: ${folder}`);
   }
 
-  if (!window.confirm('Delete this image?')) return;
   try {
+    const normalizedPublicId = public_id.replace(`Nuclio/${FOLDERS[folder]}/`, '');
     const res = await fetch(
-      `${API_BASE_URL}/images/${public_id.replace(`Nuclio/${folder}/`, '')}`,
+      `${API_BASE_URL}/cloudinary/images/${FOLDERS[folder]}/${normalizedPublicId}`,
       { method: 'DELETE' },
     );
 
@@ -72,10 +77,10 @@ const deleteImage = async (public_id, folder) => {
       throw new Error('Delete failed');
     }
 
-    // re-fetch to sync with Cloudinary
+    return await res.json();
   } catch (err) {
     console.error('Delete failed', err);
-    alert('Delete failed');
+    throw err;
   }
 };
 

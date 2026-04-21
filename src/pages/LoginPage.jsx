@@ -26,6 +26,7 @@ export default function LoginPage() {
       navigate('/profile');
     } catch (error) {
       console.error('Error', error.message);
+      setIsAuthenticated(false);
       setError(error.message);
     }
   };
