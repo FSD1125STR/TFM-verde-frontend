@@ -99,3 +99,23 @@ export const deleteVehicle = async (vehicleId) => {
 
   return responseData;
 };
+
+export const sendWorkOrderEmail = async (vehicleId, payload) => {
+  const response = await fetch(`${API_BASE_URL}/vehicle/${vehicleId}/send-work-order`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(payload),
+    credentials: 'include',
+  });
+
+  const responseData = await response.json();
+
+  if (!response.ok) {
+    throw new Error(responseData.message || 'Error al enviar la orden por email');
+  }
+
+  return responseData;
+};
