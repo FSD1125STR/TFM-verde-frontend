@@ -150,6 +150,12 @@ export default function Icon({ name, className = 'h-5 w-5' }) {
         <path d='M18 6 6 18' />
       </svg>
     ),
+    mail: (
+      <svg {...iconProps}>
+        <path d='M4 7h16a1 1 0 0 1 1 1v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a1 1 0 0 1 1-1Z' />
+        <path d='m4 8 8 6 8-6' />
+      </svg>
+    ),
   };
 
   return icons[name] ?? icons.dashboard;
