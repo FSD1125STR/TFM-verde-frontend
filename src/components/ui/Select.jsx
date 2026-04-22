@@ -14,18 +14,24 @@ export default function Select({
             </label>
         )}
 
-        <select
-            name={name}
-            value={value}
-            onChange={onChange}
-            className={`w-full rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5 ${className}`}
-        >
-            {options.map((option) => (
-            <option key={option.value} value={option.value}>
-                {option.label}
-            </option>
-            ))}
-        </select>
+        <div className="relative">
+            <select
+                name={name}
+                value={value}
+                onChange={onChange}
+                className={`w-full appearance-none rounded-2xl bg-[#1F2937] px-4 py-3 pr-12 outline-none border border-white/5 ${className}`}
+            >
+                {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                    {option.label}
+                </option>
+                ))}
+            </select>
+
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/50">
+                ▾
+            </span>
+        </div>
         </div>
     );
 }
