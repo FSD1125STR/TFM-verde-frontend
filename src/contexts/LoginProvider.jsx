@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getAuthToken } from '../services/authToken.js';
 import { fetchProfileEmployee } from '../services/fetchProfileEmployee.js';
 import { logout } from '../services/LogoutApi.js';
 import { LoginContext, initialState } from './AuthContext.js';
@@ -33,8 +34,15 @@ export const LoginProvider = ({ children }) => {
 
   useEffect(() => {
     const initializeProfile = async () => {
+      if (!getAuthToken()) {
+        setProfile(null);
+        setIsAuthenticated(false);
+        return;
+      }
+
       await getEmployeeProfile();
     };
+
     initializeProfile();
   }, []);
 

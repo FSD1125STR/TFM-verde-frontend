@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FOLDERS, uploadImage } from '../services/cloudinary.js';
+import Icon from '../components/ui/Icon.jsx';
+import { uploadImage } from '../services/cloudinary.js';
 import { updateVehicle } from '../services/vehicleApi.js';
 
 export default function VehicleSignaturePage() {
@@ -14,6 +15,15 @@ export default function VehicleSignaturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const vehicleId = location.state?.vehicleId;
   const clientId = location.state?.clientId;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   const getCoordinates = (event) => {
     const canvas = canvasRef.current;
@@ -37,7 +47,7 @@ export default function VehicleSignaturePage() {
 
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -67,6 +77,8 @@ export default function VehicleSignaturePage() {
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
   };
 
@@ -127,7 +139,7 @@ export default function VehicleSignaturePage() {
   };
 
   return (
-    <div className='max-w-5xl space-y-8 text-white'>
+    <div className='w-full space-y-8 text-white'>
       <div>
         <h1 className='text-3xl font-bold'>Recepción de Vehículo</h1>
         <p className='text-white/60'>
@@ -135,11 +147,11 @@ export default function VehicleSignaturePage() {
         </p>
       </div>
 
-      <div className='flex items-center gap-6 max-w-3xl'>
+      <div className='flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+            className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
               step === 3
                 ? 'bg-blue-600 text-white'
                 : step < 3
@@ -152,11 +164,11 @@ export default function VehicleSignaturePage() {
         ))}
       </div>
 
-      <div className='bg-[#111827] rounded-3xl p-8 shadow-xl space-y-8'>
-        <div className='flex items-center justify-between'>
+      <div className='space-y-8 rounded-3xl bg-[#111827] p-5 shadow-xl sm:p-8'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center'>
-              ✍️
+            <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
+              <Icon name='signature' />
             </div>
 
             <h2 className='text-sm font-bold tracking-widest text-white/80'>
@@ -165,9 +177,11 @@ export default function VehicleSignaturePage() {
           </div>
 
           <button
+            type='button'
             onClick={clearSignature}
-            className='px-4 py-2 rounded-xl bg-[#1F2937] text-xs tracking-widest text-white/60 hover:text-white'
+            className='inline-flex items-center gap-2 rounded-xl bg-[#1F2937] px-4 py-2 text-xs tracking-widest text-white/60 transition hover:text-white'
           >
+            <Icon name='trash' className='h-4 w-4' />
             LIMPIAR FIRMA
           </button>
         </div>
@@ -176,12 +190,12 @@ export default function VehicleSignaturePage() {
           <p className='text-sm text-red-400'>{submitError}</p>
         ) : null}
 
-        <div className='rounded-3xl border-2 border-dashed border-white/10 bg-[#172033] p-4'>
+        <div className='rounded-3xl border-2 border-dashed border-slate-300/70 bg-slate-100 p-4'>
           <canvas
             ref={canvasRef}
             width={900}
             height={260}
-            className='w-full h-[260px] rounded-2xl cursor-crosshair'
+            className='h-[260px] w-full cursor-crosshair rounded-2xl bg-white'
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
@@ -192,41 +206,43 @@ export default function VehicleSignaturePage() {
           />
         </div>
 
-        <label className='flex items-start gap-3 rounded-2xl bg-[#16213A] border border-blue-500/20 p-4 cursor-pointer'>
+        <label className='flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-500/20 bg-[#16213A] p-4'>
           <input
             type='checkbox'
             checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
+            onChange={(event) => setAccepted(event.target.checked)}
             className='mt-1 accent-blue-600'
           />
 
-          <span className='text-sm text-white/70 leading-relaxed'>
+          <span className='text-sm leading-relaxed text-white/70'>
             Confirmo que he revisado el registro de entrada. Acepto los términos
             del servicio y autorizo el inicio de los trabajos de
-            diagnóstico/reparación en el taller AutoSync.
+            diagnóstico/reparación en el taller.
           </span>
         </label>
 
-        <div className='flex justify-between pt-6'>
+        <div className='flex flex-col-reverse gap-3 pt-6 sm:flex-row sm:justify-between'>
           <button
             onClick={() =>
               navigate('/vehicle-status', { state: { vehicleId, clientId } })
             }
-            className='px-6 py-3 rounded-xl text-white/60 hover:text-white'
+            className='inline-flex items-center gap-2 rounded-xl px-4 py-3 text-white/60 transition hover:bg-white/10 hover:text-white'
           >
+            <Icon name='arrowLeft' className='h-4 w-4' />
             Atrás
           </button>
 
           <button
             onClick={handleFinish}
             disabled={!accepted || !hasSignature || isSubmitting}
-            className={`px-8 py-3 rounded-xl font-medium ${
+            className={`inline-flex items-center gap-2 rounded-xl px-8 py-3 font-medium ${
               accepted && hasSignature && !isSubmitting
-                ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                : 'bg-emerald-500/40 text-white/50 cursor-not-allowed'
+                ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                : 'cursor-not-allowed bg-emerald-500/40 text-white/50'
             }`}
           >
             {isSubmitting ? 'Guardando...' : 'Finalizar registro'}
+            {!isSubmitting ? <Icon name='arrowRight' className='h-4 w-4' /> : null}
           </button>
         </div>
       </div>

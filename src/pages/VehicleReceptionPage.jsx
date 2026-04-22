@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Icon from '../components/ui/Icon.jsx';
 import { getCustomers } from '../services/customerApi.js';
 import { createVehicle } from '../services/vehicleApi.js';
 
@@ -43,8 +44,8 @@ export default function VehicleReceptionPage() {
     fetchCustomers();
   }, []);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  const handleChange = (event) => {
+    const { name, value } = event.target;
 
     setFormData((prev) => ({
       ...prev,
@@ -52,17 +53,17 @@ export default function VehicleReceptionPage() {
     }));
   };
 
-  const handleFuelChange = (e) => {
+  const handleFuelChange = (event) => {
     setFormData((prev) => ({
       ...prev,
-      cantidad_combustible: Number(e.target.value),
+      cantidad_combustible: Number(event.target.value),
     }));
   };
 
   const isClientSelected = Boolean(formData.client_id);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setSubmitError('');
     setSuccessMessage('');
 
@@ -107,7 +108,7 @@ export default function VehicleReceptionPage() {
   };
 
   return (
-    <div className='max-w-5xl space-y-8 text-white'>
+    <div className='w-full space-y-8 text-white'>
       <div>
         <h1 className='text-3xl font-bold'>Recepción de Vehículo</h1>
         <p className='text-white/60'>
@@ -115,11 +116,11 @@ export default function VehicleReceptionPage() {
         </p>
       </div>
 
-      <div className='flex items-center gap-6 max-w-3xl'>
+      <div className='flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+            className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
               step === 1
                 ? 'bg-blue-600 text-white'
                 : 'bg-[#1F2937] text-white/40'
@@ -132,11 +133,11 @@ export default function VehicleReceptionPage() {
 
       <form
         onSubmit={handleSubmit}
-        className='bg-[#111827] rounded-3xl p-8 shadow-xl space-y-8'
+        className='space-y-8 rounded-3xl bg-[#111827] p-5 shadow-xl sm:p-8'
       >
         <div className='flex items-center gap-3'>
-          <div className='w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center'>
-            🚗
+          <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
+            <Icon name='vehicles' />
           </div>
           <h2 className='text-sm font-bold tracking-widest text-white/80'>
             INFORMACIÓN DEL VEHÍCULO
@@ -157,7 +158,7 @@ export default function VehicleReceptionPage() {
 
         <div className='grid grid-cols-1 gap-6 md:grid-cols-2'>
           <div className='md:col-span-2'>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
+            <label className='mb-2 block text-[11px] uppercase tracking-widest text-white/40'>
               Cliente
             </label>
             {customersLoading ? (
@@ -168,115 +169,85 @@ export default function VehicleReceptionPage() {
                   name='client_id'
                   value={formData.client_id}
                   onChange={handleChange}
-                  className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
+                  className='w-full rounded-xl bg-[#1F2937] p-3 outline-none'
                 >
                   <option value=''>Selecciona un cliente</option>
                   {customers.map((customer) => (
-                  <option key={customer._id} value={customer._id}>
+                    <option key={customer._id} value={customer._id}>
                       {customer.displayName} - {customer.identifier}
-                  </option>
-                ))}
-              </select>
+                    </option>
+                  ))}
+                </select>
 
                 {!isClientSelected ? (
                   <p className='mt-2 text-xs text-amber-300'>
-                    Debes seleccionar un cliente antes de introducir los datos del
-                    vehículo.
+                    Debes seleccionar un cliente antes de introducir los datos
+                    del vehículo.
                   </p>
                 ) : null}
               </>
             )}
           </div>
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Matrícula
-            </label>
-            <input
-              name='matricula'
-              value={formData.matricula}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='1234ABC'
-            />
-          </div>
+          <TextField
+            label='Matrícula'
+            name='matricula'
+            value={formData.matricula}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            placeholder='1234ABC'
+          />
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Número de bastidor
-            </label>
-            <input
-              name='n_bastidor'
-              value={formData.n_bastidor}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='VF1ABC12345678901'
-            />
-          </div>
+          <TextField
+            label='Número de bastidor'
+            name='n_bastidor'
+            value={formData.n_bastidor}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            placeholder='VF1ABC12345678901'
+          />
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Marca
-            </label>
-            <input
-              name='marca'
-              value={formData.marca}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='Toyota'
-            />
-          </div>
+          <TextField
+            label='Marca'
+            name='marca'
+            value={formData.marca}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            placeholder='Toyota'
+          />
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Modelo
-            </label>
-            <input
-              name='modelo'
-              value={formData.modelo}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='Corolla'
-            />
-          </div>
+          <TextField
+            label='Modelo'
+            name='modelo'
+            value={formData.modelo}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            placeholder='Corolla'
+          />
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Tipo de combustible
-            </label>
-            <input
-              name='tipo_combustible'
-              value={formData.tipo_combustible}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='Gasolina'
-            />
-          </div>
+          <TextField
+            label='Tipo de combustible'
+            name='tipo_combustible'
+            value={formData.tipo_combustible}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            placeholder='Gasolina'
+          />
 
-          <div>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
-              Año
-            </label>
-            <input
-              type='number'
-              min='1900'
-              max='2099'
-              name='year'
-              value={formData.year}
-              onChange={handleChange}
-              disabled={!isClientSelected}
-              className='bg-[#1F2937] p-3 rounded-xl w-full outline-none'
-              placeholder='2020'
-            />
-          </div>
+          <TextField
+            type='number'
+            label='Año'
+            name='year'
+            value={formData.year}
+            onChange={handleChange}
+            disabled={!isClientSelected}
+            min='1900'
+            max='2099'
+            placeholder='2020'
+          />
 
           <div className='md:col-span-2'>
-            <label className='block text-[11px] uppercase tracking-widest text-white/40 mb-2'>
+            <label className='mb-2 block text-[11px] uppercase tracking-widest text-white/40'>
               Cantidad de combustible
             </label>
             <input
@@ -290,14 +261,12 @@ export default function VehicleReceptionPage() {
               className='w-full accent-blue-600'
             />
 
-            <div className='flex justify-between text-xs text-white/40 mt-2'>
+            <div className='mt-2 flex justify-between text-xs text-white/40'>
               {fuelLabels.map((label, index) => (
                 <span
                   key={label}
                   className={
-                    index === formData.cantidad_combustible
-                      ? 'text-blue-300'
-                      : ''
+                    index === formData.cantidad_combustible ? 'text-blue-300' : ''
                   }
                 >
                   {label}
@@ -311,20 +280,36 @@ export default function VehicleReceptionPage() {
           <button
             type='button'
             onClick={() => navigate('/client-info')}
-            className='px-6 py-3 rounded-xl text-white/60 hover:text-white'
+            className='inline-flex items-center gap-2 rounded-xl px-4 py-3 text-white/60 transition hover:bg-white/10 hover:text-white'
           >
+            <Icon name='arrowLeft' className='h-4 w-4' />
             Atrás
           </button>
 
           <button
             type='submit'
             disabled={isSubmitting || customersLoading || !isClientSelected}
-            className='bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-8 py-3 rounded-xl'
+            className='inline-flex items-center gap-2 rounded-xl bg-blue-600 px-8 py-3 text-white hover:bg-blue-700 disabled:opacity-50'
           >
             {isSubmitting ? 'Guardando...' : 'Guardar vehículo'}
+            {!isSubmitting ? <Icon name='arrowRight' className='h-4 w-4' /> : null}
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+function TextField({ label, ...props }) {
+  return (
+    <div>
+      <label className='mb-2 block text-[11px] uppercase tracking-widest text-white/40'>
+        {label}
+      </label>
+      <input
+        {...props}
+        className='w-full rounded-xl bg-[#1F2937] p-3 outline-none disabled:cursor-not-allowed disabled:opacity-50'
+      />
     </div>
   );
 }
