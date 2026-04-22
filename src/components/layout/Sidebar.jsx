@@ -1,7 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useContext } from "react";
 import { LoginContext } from "../../contexts/AuthContext.js";
-import { logout } from "../../services/logoutApi.js";
+import { logout } from "../../services/LogoutApi.js";
 
 export default function Sidebar() {
   const location = useLocation();
