@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Button from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
+import Icon from '../components/ui/Icon.jsx';
 import Input from '../components/ui/Input.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import Select from '../components/ui/Select.jsx';
@@ -117,13 +118,13 @@ function WorkOrderCard({ order }) {
             <div className='grid gap-3 text-sm text-white/65 sm:grid-cols-2'>
               <div className='flex items-center gap-3'>
                 <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/45'>
-                  CL
+                  <Icon name='profile' className='h-4 w-4' />
                 </span>
                 <span className='truncate'>{order.customerName}</span>
               </div>
               <div className='flex items-center gap-3'>
                 <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-300'>
-                  ME
+                  <Icon name='wrench' className='h-4 w-4' />
                 </span>
                 <span className='truncate'>{order.mechanicName}</span>
               </div>
@@ -142,24 +143,27 @@ function WorkOrderCard({ order }) {
         <div className='flex items-center justify-end gap-2 text-white/45'>
           <button
             type='button'
-            className='h-10 w-10 rounded-xl transition hover:bg-white/10 hover:text-white'
+            className='flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/10 hover:text-white'
             aria-label='Descargar orden'
+            title='Descargar orden'
           >
-            DL
+            <Icon name='download' className='h-5 w-5' />
           </button>
           <button
             type='button'
-            className='h-10 w-10 rounded-xl transition hover:bg-white/10 hover:text-white'
+            className='flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/10 hover:text-white'
             aria-label='Mas opciones'
+            title='Mas opciones'
           >
-            ...
+            <Icon name='more' className='h-5 w-5' />
           </button>
           <Link
             to='/vehicles'
             className='flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-lg transition hover:bg-blue-600 hover:text-white'
             aria-label='Abrir vehiculo'
+            title='Abrir vehiculo'
           >
-            &gt;
+            <Icon name='arrowRight' className='h-5 w-5' />
           </Link>
         </div>
       </div>

@@ -3,23 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { LoginContext } from '../contexts/AuthContext.js';
 import { login } from '../services/LoginApi.js';
-
-function WrenchIcon() {
-  return (
-    <svg
-      className='h-7 w-7'
-      viewBox='0 0 24 24'
-      fill='none'
-      stroke='currentColor'
-      strokeWidth='1.8'
-      strokeLinecap='round'
-      strokeLinejoin='round'
-      aria-hidden='true'
-    >
-      <path d='M14.7 6.3a5 5 0 0 0-6 6L4 17l3 3 4.7-4.7a5 5 0 0 0 6-6l-3.2 3.2-3-1 1-3 3.2-3.2Z' />
-    </svg>
-  );
-}
+import Icon from '../components/ui/Icon.jsx';
 
 export default function LoginPage() {
   const [error, setError] = useState('');
@@ -53,7 +37,7 @@ export default function LoginPage() {
         <div className='rounded-3xl border border-white/10 bg-[#0F172A] p-8 shadow-2xl'>
           <div className='mb-8 text-center'>
             <div className='mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-white'>
-              <WrenchIcon />
+              <Icon name='wrench' className='h-7 w-7' />
             </div>
 
             <h1 className='text-3xl font-bold text-white'>Mechanic Manager</h1>

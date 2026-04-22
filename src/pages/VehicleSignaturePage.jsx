@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { FOLDERS, uploadImage } from '../services/cloudinary.js';
+import Icon from '../components/ui/Icon.jsx';
+import { uploadImage } from '../services/cloudinary.js';
 import { updateVehicle } from '../services/vehicleApi.js';
 
 export default function VehicleSignaturePage() {
@@ -135,11 +136,11 @@ export default function VehicleSignaturePage() {
         </p>
       </div>
 
-      <div className='flex items-center gap-6 max-w-3xl'>
+      <div className='flex max-w-3xl items-center gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
-            className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
+            className={`flex h-10 w-10 items-center justify-center rounded-xl font-bold ${
               step === 3
                 ? 'bg-blue-600 text-white'
                 : step < 3
@@ -152,11 +153,11 @@ export default function VehicleSignaturePage() {
         ))}
       </div>
 
-      <div className='bg-[#111827] rounded-3xl p-8 shadow-xl space-y-8'>
-        <div className='flex items-center justify-between'>
+      <div className='space-y-8 rounded-3xl bg-[#111827] p-8 shadow-xl'>
+        <div className='flex items-center justify-between gap-4'>
           <div className='flex items-center gap-3'>
-            <div className='w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center'>
-              ✍️
+            <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
+              <Icon name='signature' />
             </div>
 
             <h2 className='text-sm font-bold tracking-widest text-white/80'>
@@ -165,9 +166,11 @@ export default function VehicleSignaturePage() {
           </div>
 
           <button
+            type='button'
             onClick={clearSignature}
-            className='px-4 py-2 rounded-xl bg-[#1F2937] text-xs tracking-widest text-white/60 hover:text-white'
+            className='inline-flex items-center gap-2 rounded-xl bg-[#1F2937] px-4 py-2 text-xs tracking-widest text-white/60 transition hover:text-white'
           >
+            <Icon name='trash' className='h-4 w-4' />
             LIMPIAR FIRMA
           </button>
         </div>
@@ -181,7 +184,7 @@ export default function VehicleSignaturePage() {
             ref={canvasRef}
             width={900}
             height={260}
-            className='w-full h-[260px] rounded-2xl cursor-crosshair'
+            className='h-[260px] w-full cursor-crosshair rounded-2xl'
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
@@ -192,18 +195,18 @@ export default function VehicleSignaturePage() {
           />
         </div>
 
-        <label className='flex items-start gap-3 rounded-2xl bg-[#16213A] border border-blue-500/20 p-4 cursor-pointer'>
+        <label className='flex cursor-pointer items-start gap-3 rounded-2xl border border-blue-500/20 bg-[#16213A] p-4'>
           <input
             type='checkbox'
             checked={accepted}
-            onChange={(e) => setAccepted(e.target.checked)}
+            onChange={(event) => setAccepted(event.target.checked)}
             className='mt-1 accent-blue-600'
           />
 
-          <span className='text-sm text-white/70 leading-relaxed'>
+          <span className='text-sm leading-relaxed text-white/70'>
             Confirmo que he revisado el registro de entrada. Acepto los términos
             del servicio y autorizo el inicio de los trabajos de
-            diagnóstico/reparación en el taller AutoSync.
+            diagnóstico/reparación en el taller.
           </span>
         </label>
 
@@ -212,21 +215,23 @@ export default function VehicleSignaturePage() {
             onClick={() =>
               navigate('/vehicle-status', { state: { vehicleId, clientId } })
             }
-            className='px-6 py-3 rounded-xl text-white/60 hover:text-white'
+            className='inline-flex items-center gap-2 rounded-xl px-4 py-3 text-white/60 transition hover:bg-white/10 hover:text-white'
           >
+            <Icon name='arrowLeft' className='h-4 w-4' />
             Atrás
           </button>
 
           <button
             onClick={handleFinish}
             disabled={!accepted || !hasSignature || isSubmitting}
-            className={`px-8 py-3 rounded-xl font-medium ${
+            className={`inline-flex items-center gap-2 rounded-xl px-8 py-3 font-medium ${
               accepted && hasSignature && !isSubmitting
-                ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                : 'bg-emerald-500/40 text-white/50 cursor-not-allowed'
+                ? 'bg-emerald-500 text-white hover:bg-emerald-600'
+                : 'cursor-not-allowed bg-emerald-500/40 text-white/50'
             }`}
           >
             {isSubmitting ? 'Guardando...' : 'Finalizar registro'}
+            {!isSubmitting ? <Icon name='arrowRight' className='h-4 w-4' /> : null}
           </button>
         </div>
       </div>
