@@ -2,10 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useContext } from "react";
 
 import HomePage from "./pages/HomePage";
-import RegisterPage from "./pages/RegisterPage";
 import LoginPage from "./pages/LoginPage";
 import ProfilePage from "./pages/ProfilePage";
-import DesignSystem from "./pages/DesignSystem";
 import VehicleReceptionPage from "./pages/VehicleReceptionPage";
 import VehicleStatusPage from "./pages/VehicleStatusPage";
 import VehicleSignaturePage from "./pages/VehicleSignaturePage";
@@ -28,8 +26,6 @@ function AppRoutes() {
         element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />}
       />
 
-      <Route path="/register" element={<RegisterPage />} />
-
       <Route
         path="/"
         element={isAuthenticated ? <AppLayout /> : <Navigate to="/login" />}
@@ -44,7 +40,6 @@ function AppRoutes() {
         <Route path="work-orders" element={<WorkOrdersPage />} />
         <Route path="chat" element={<ChatPage />} />
         <Route path="profile" element={<ProfilePage />} />
-        <Route path="design-system" element={<DesignSystem />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/login" />} />
