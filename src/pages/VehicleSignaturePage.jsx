@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import Icon from '../components/ui/Icon.jsx';
 import { uploadImage } from '../services/cloudinary.js';
@@ -15,6 +15,15 @@ export default function VehicleSignaturePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const vehicleId = location.state?.vehicleId;
   const clientId = location.state?.clientId;
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, []);
 
   const getCoordinates = (event) => {
     const canvas = canvasRef.current;
@@ -38,7 +47,7 @@ export default function VehicleSignaturePage() {
 
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -68,6 +77,8 @@ export default function VehicleSignaturePage() {
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setHasSignature(false);
   };
 
@@ -128,7 +139,7 @@ export default function VehicleSignaturePage() {
   };
 
   return (
-    <div className='max-w-5xl space-y-8 text-white'>
+    <div className='w-full space-y-8 text-white'>
       <div>
         <h1 className='text-3xl font-bold'>Recepción de Vehículo</h1>
         <p className='text-white/60'>
@@ -136,7 +147,7 @@ export default function VehicleSignaturePage() {
         </p>
       </div>
 
-      <div className='flex max-w-3xl items-center gap-6'>
+      <div className='flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
@@ -153,8 +164,8 @@ export default function VehicleSignaturePage() {
         ))}
       </div>
 
-      <div className='space-y-8 rounded-3xl bg-[#111827] p-8 shadow-xl'>
-        <div className='flex items-center justify-between gap-4'>
+      <div className='space-y-8 rounded-3xl bg-[#111827] p-5 shadow-xl sm:p-8'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
           <div className='flex items-center gap-3'>
             <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
               <Icon name='signature' />
@@ -179,12 +190,12 @@ export default function VehicleSignaturePage() {
           <p className='text-sm text-red-400'>{submitError}</p>
         ) : null}
 
-        <div className='rounded-3xl border-2 border-dashed border-white/10 bg-[#172033] p-4'>
+        <div className='rounded-3xl border-2 border-dashed border-slate-300/70 bg-slate-100 p-4'>
           <canvas
             ref={canvasRef}
             width={900}
             height={260}
-            className='h-[260px] w-full cursor-crosshair rounded-2xl'
+            className='h-[260px] w-full cursor-crosshair rounded-2xl bg-white'
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
@@ -210,7 +221,7 @@ export default function VehicleSignaturePage() {
           </span>
         </label>
 
-        <div className='flex justify-between pt-6'>
+        <div className='flex flex-col-reverse gap-3 pt-6 sm:flex-row sm:justify-between'>
           <button
             onClick={() =>
               navigate('/vehicle-status', { state: { vehicleId, clientId } })

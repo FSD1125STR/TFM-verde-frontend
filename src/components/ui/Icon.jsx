@@ -137,6 +137,19 @@ export default function Icon({ name, className = 'h-5 w-5' }) {
         <path d='M15 18 9 12l6-6' />
       </svg>
     ),
+    menu: (
+      <svg {...iconProps}>
+        <path d='M4 7h16' />
+        <path d='M4 12h16' />
+        <path d='M4 17h16' />
+      </svg>
+    ),
+    close: (
+      <svg {...iconProps}>
+        <path d='M6 6l12 12' />
+        <path d='M18 6 6 18' />
+      </svg>
+    ),
   };
 
   return icons[name] ?? icons.dashboard;

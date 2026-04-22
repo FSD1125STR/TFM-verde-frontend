@@ -23,7 +23,7 @@ export default function LoginPage() {
       await login(data.email, data.password);
       setIsAuthenticated(true);
       await getEmployeeProfile();
-      navigate('/profile');
+      navigate('/');
     } catch (error) {
       console.error('Error', error.message);
       setIsAuthenticated(false);

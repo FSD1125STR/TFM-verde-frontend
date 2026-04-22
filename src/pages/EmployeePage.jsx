@@ -296,7 +296,7 @@ export default function EmployeePage() {
 
   return (
     <>
-      <section className='max-w-6xl space-y-6 text-white'>
+      <section className='w-full space-y-6 text-white'>
         <PageHeader
           title='Gestión de Empleados'
           description='Administra el personal del taller y sus permisos.'

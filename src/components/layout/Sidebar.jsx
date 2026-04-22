@@ -4,7 +4,10 @@ import { LoginContext } from '../../contexts/AuthContext.js';
 import { logout } from '../../services/LogoutApi.js';
 import Icon from '../ui/Icon.jsx';
 
-export default function Sidebar() {
+export default function Sidebar({
+  isMobileOpen = false,
+  onCloseMobile = () => {},
+}) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -27,6 +30,7 @@ export default function Sidebar() {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      onCloseMobile();
       setIsAuthenticated(false);
       navigate('/login');
     }
@@ -43,16 +47,30 @@ export default function Sidebar() {
     profile?.employee?.email ||
     'Sesion iniciada';
 
+  const isDesktopCollapsed = isCollapsed && !isMobileOpen;
+  const showCompactSidebar = isDesktopCollapsed;
+
   return (
-    <aside
-      className={`h-screen shrink-0 bg-[#0F172A] text-white flex flex-col justify-between border-r border-white/5 px-4 py-6 transition-[width] duration-300 ${
-        isCollapsed ? 'w-24' : 'w-72'
-      }`}
-    >
-      <div>
+    <>
+      <div
+        className={`fixed inset-0 z-40 bg-[#020617]/70 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${
+          isMobileOpen
+            ? 'pointer-events-auto opacity-100'
+            : 'pointer-events-none opacity-0'
+        }`}
+        onClick={onCloseMobile}
+        aria-hidden='true'
+      />
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex h-screen w-[86vw] max-w-72 flex-col justify-between border-r border-white/5 bg-[#0F172A] px-4 py-6 text-white transition-transform duration-300 lg:sticky lg:top-0 lg:z-20 lg:w-auto lg:max-w-none lg:translate-x-0 lg:shrink-0 ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } ${showCompactSidebar ? 'lg:w-24' : 'lg:w-72'}`}
+      >
+        <div>
         <div
           className={`mb-8 flex items-center ${
-            isCollapsed ? 'justify-center' : 'justify-between gap-3'
+            showCompactSidebar ? 'lg:justify-center' : 'justify-between gap-3'
           }`}
         >
           <div className='flex min-w-0 items-center gap-4'>
@@ -60,7 +78,7 @@ export default function Sidebar() {
               <Icon name='wrench' className='h-6 w-6' />
             </div>
 
-            {!isCollapsed ? (
+            {!showCompactSidebar ? (
               <div className='min-w-0'>
                 <p className='truncate text-lg font-bold'>Mechanic Manager</p>
                 <p className='text-sm text-white/60'>Taller Mecanico</p>
@@ -68,24 +86,35 @@ export default function Sidebar() {
             ) : null}
           </div>
 
-          {!isCollapsed ? (
+          <div className='ml-auto flex items-start gap-2 self-start'>
+            <button
+              type='button'
+              onClick={onCloseMobile}
+              className='absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white lg:hidden'
+              aria-label='Cerrar menu'
+            >
+              <Icon name='chevron' />
+            </button>
+
+          {!showCompactSidebar ? (
             <button
               type='button'
               onClick={() => setIsCollapsed(true)}
-              className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white/55 transition hover:bg-white/10 hover:text-white'
+              className='hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white/55 transition hover:bg-white/10 hover:text-white lg:flex'
               aria-label='Contraer barra lateral'
               title='Contraer'
             >
               <Icon name='chevron' />
             </button>
           ) : null}
+          </div>
         </div>
 
-        {isCollapsed ? (
+        {showCompactSidebar ? (
           <button
             type='button'
             onClick={() => setIsCollapsed(false)}
-            className='mb-5 flex h-10 w-full items-center justify-center rounded-xl text-white/55 transition hover:bg-white/10 hover:text-white'
+            className='mb-5 hidden h-10 w-full items-center justify-center rounded-xl text-white/55 transition hover:bg-white/10 hover:text-white lg:flex'
             aria-label='Abrir barra lateral'
             title='Abrir menu'
           >
@@ -101,53 +130,66 @@ export default function Sidebar() {
               <Link
                 key={item.path}
                 to={item.path}
-                title={isCollapsed ? item.label : undefined}
+                onClick={onCloseMobile}
+                title={showCompactSidebar ? item.label : undefined}
                 className={`flex items-center rounded-xl text-sm transition ${
-                  isCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'
+                  showCompactSidebar
+                    ? 'lg:justify-center lg:px-3 lg:py-3'
+                    : 'gap-3 px-4 py-3'
                 } ${
                   active
                     ? 'bg-blue-600 text-white'
                     : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
               >
-                <Icon name={item.icon} />
-                {!isCollapsed ? <span>{item.label}</span> : null}
+                <Icon name={item.icon} className='h-5 w-5 shrink-0' />
+                {!showCompactSidebar ? (
+                  <span className='truncate font-medium'>{item.label}</span>
+                ) : null}
               </Link>
             );
           })}
         </nav>
-      </div>
+        </div>
 
-      <div className='space-y-4'>
+        <div className='space-y-4'>
         <div
           className={`rounded-xl bg-white/5 ${
-            isCollapsed ? 'flex justify-center p-3' : 'p-4'
+            showCompactSidebar ? 'lg:flex lg:justify-center lg:p-3' : 'p-4'
           }`}
-          title={isCollapsed ? `${userLabel} - ${roleLabel}` : undefined}
+          title={showCompactSidebar ? `${userLabel} - ${roleLabel}` : undefined}
         >
-          {isCollapsed ? (
+          {showCompactSidebar ? (
             <div className='flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-white/70'>
               {String(userLabel).slice(0, 2)}
             </div>
           ) : (
-            <>
-              <p className='truncate text-sm font-semibold'>{userLabel}</p>
-              <p className='text-xs text-white/60'>{roleLabel}</p>
-            </>
+            <div className='flex items-center gap-3'>
+              <div className='flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold uppercase text-white/70'>
+                {String(userLabel).slice(0, 2)}
+              </div>
+              <div className='min-w-0'>
+                <p className='truncate text-sm font-semibold'>{userLabel}</p>
+                <p className='truncate text-xs text-white/60'>{roleLabel}</p>
+              </div>
+            </div>
           )}
         </div>
 
         <button
           onClick={handleLogout}
-          title={isCollapsed ? 'Cerrar sesion' : undefined}
+          title={showCompactSidebar ? 'Cerrar sesion' : undefined}
           className={`flex w-full items-center rounded-xl bg-red-500/15 text-red-400 transition hover:bg-red-500/25 ${
-            isCollapsed ? 'justify-center px-3 py-3' : 'gap-3 px-4 py-3'
+            showCompactSidebar
+              ? 'lg:justify-center lg:px-3 lg:py-3'
+              : 'gap-3 px-4 py-3'
           }`}
         >
           <Icon name='logout' />
-          {!isCollapsed ? <span>Cerrar sesion</span> : null}
+          {!showCompactSidebar ? <span>Cerrar sesion</span> : null}
         </button>
-      </div>
-    </aside>
+        </div>
+      </aside>
+    </>
   );
 }

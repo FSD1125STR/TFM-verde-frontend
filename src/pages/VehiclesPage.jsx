@@ -131,6 +131,17 @@ export default function VehiclesPage() {
   }, []);
 
   useEffect(() => {
+    if (!isModalOpen) return;
+
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, [isModalOpen]);
+
+  useEffect(() => {
     if (selectedCustomer === 'all') {
       setSearchParams({});
       return;
@@ -293,7 +304,7 @@ export default function VehiclesPage() {
 
     ctx.beginPath();
     ctx.moveTo(x, y);
-    ctx.strokeStyle = '#ffffff';
+    ctx.strokeStyle = '#0f172a';
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -324,6 +335,8 @@ export default function VehiclesPage() {
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     setHasNewSignature(false);
   };
 
@@ -439,7 +452,7 @@ export default function VehiclesPage() {
 
   return (
     <>
-      <section className='max-w-6xl space-y-6 text-white'>
+      <section className='w-full space-y-6 text-white'>
         <PageHeader
           title='Vehiculos'
           description='Consulta, edita y elimina los vehiculos registrados.'

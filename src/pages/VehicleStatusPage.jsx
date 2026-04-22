@@ -60,7 +60,7 @@ export default function VehicleStatusPage() {
   };
 
   return (
-    <div className='max-w-5xl space-y-8 text-white'>
+    <div className='w-full space-y-8 text-white'>
       <div>
         <h1 className='text-3xl font-bold'>Recepción de Vehículo</h1>
         <p className='text-white/60'>
@@ -68,7 +68,7 @@ export default function VehicleStatusPage() {
         </p>
       </div>
 
-      <div className='flex max-w-3xl items-center gap-6'>
+      <div className='flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
@@ -85,7 +85,7 @@ export default function VehicleStatusPage() {
         ))}
       </div>
 
-      <div className='space-y-8 rounded-3xl bg-[#111827] p-8 shadow-xl'>
+      <div className='space-y-8 rounded-3xl bg-[#111827] p-5 shadow-xl sm:p-8'>
         <div className='flex items-center gap-3'>
           <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
             <Icon name='camera' />
@@ -147,7 +147,7 @@ export default function VehicleStatusPage() {
           </p>
         </div>
 
-        <div className='flex justify-between pt-6'>
+        <div className='flex flex-col-reverse gap-3 pt-6 sm:flex-row sm:justify-between'>
           <button
             onClick={() => navigate('/vehicle-reception')}
             className='inline-flex items-center gap-2 rounded-xl px-4 py-3 text-white/60 transition hover:bg-white/10 hover:text-white'

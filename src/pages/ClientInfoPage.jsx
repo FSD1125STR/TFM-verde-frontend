@@ -11,7 +11,7 @@ export default function ClientInfoPage() {
     const navigate = useNavigate();
 
     return (
-        <div className="max-w-5xl space-y-8 text-white">
+        <div className="w-full space-y-8 text-white">
         <div>
             <h1 className="text-3xl font-bold">Recepción de Vehículo</h1>
             <p className="text-white/60">
@@ -19,7 +19,7 @@ export default function ClientInfoPage() {
             </p>
         </div>
 
-        <div className="flex items-center gap-6 max-w-3xl">
+        <div className="flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6">
             {[1, 2, 3, 4].map((step) => (
             <div
                 key={step}
@@ -36,7 +36,7 @@ export default function ClientInfoPage() {
             ))}
         </div>
 
-        <div className="bg-[#111827] rounded-3xl p-8 shadow-xl space-y-8">
+        <div className="bg-[#111827] rounded-3xl p-5 shadow-xl space-y-8 sm:p-8">
             <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-600 text-white rounded-xl flex items-center justify-center">
                 👤
@@ -46,7 +46,7 @@ export default function ClientInfoPage() {
             </h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
                 <label className="block text-[11px] uppercase tracking-widest text-white/40 mb-2">
                 Nombre
@@ -91,7 +91,7 @@ export default function ClientInfoPage() {
                 />
             </div>
 
-            <div className="col-span-2">
+            <div className="md:col-span-2">
                 <label className="block text-[11px] uppercase tracking-widest text-white/40 mb-2">
                 Dirección de contacto
                 </label>
@@ -103,7 +103,7 @@ export default function ClientInfoPage() {
             </div>
             </div>
 
-            <div className="flex justify-between pt-6">
+            <div className="flex flex-col-reverse gap-3 pt-6 sm:flex-row sm:justify-between">
             <button
                 onClick={() => navigate("/vehicle-reception")}
                 className="px-6 py-3 rounded-xl text-white/60 hover:text-white"

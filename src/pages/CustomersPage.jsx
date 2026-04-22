@@ -271,7 +271,7 @@ export default function CustomersPage() {
 
   return (
     <>
-      <section className='max-w-6xl space-y-6 text-white'>
+      <section className='w-full space-y-6 text-white'>
         <PageHeader
           title='Gestión de Clientes'
           description='Crea, consulta y administra los clientes del taller.'

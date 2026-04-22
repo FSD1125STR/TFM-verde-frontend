@@ -108,7 +108,7 @@ export default function VehicleReceptionPage() {
   };
 
   return (
-    <div className='max-w-5xl space-y-8 text-white'>
+    <div className='w-full space-y-8 text-white'>
       <div>
         <h1 className='text-3xl font-bold'>Recepción de Vehículo</h1>
         <p className='text-white/60'>
@@ -116,7 +116,7 @@ export default function VehicleReceptionPage() {
         </p>
       </div>
 
-      <div className='flex max-w-3xl items-center gap-6'>
+      <div className='flex w-full max-w-4xl flex-wrap items-center gap-4 sm:gap-6'>
         {[1, 2, 3].map((step) => (
           <div
             key={step}
@@ -133,7 +133,7 @@ export default function VehicleReceptionPage() {
 
       <form
         onSubmit={handleSubmit}
-        className='space-y-8 rounded-3xl bg-[#111827] p-8 shadow-xl'
+        className='space-y-8 rounded-3xl bg-[#111827] p-5 shadow-xl sm:p-8'
       >
         <div className='flex items-center gap-3'>
           <div className='flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white'>
