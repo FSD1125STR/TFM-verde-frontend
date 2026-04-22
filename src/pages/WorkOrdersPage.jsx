@@ -7,7 +7,7 @@ import Input from '../components/ui/Input.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import Select from '../components/ui/Select.jsx';
 import { getEmployees } from '../services/employeeApi.js';
-import { getVehicles } from '../services/vehicleApi.js';
+import { getVehicles, sendWorkOrderEmail, updateVehicle } from '../services/vehicleApi.js';
 
 const statusStyles = {
   'En proceso': 'border-blue-500/30 bg-blue-500/15 text-blue-300',
@@ -30,6 +30,8 @@ function getEmployeeName(employee) {
 }
 
 function getOrderStatus(vehicle) {
+  if (vehicle.work_order_status) return vehicle.work_order_status;
+
   const hasPhotos = Array.isArray(vehicle.reception_images) && vehicle.reception_images.length > 0;
   const hasSignature = Boolean(vehicle.customer_signature?.url);
 
@@ -54,22 +56,12 @@ function buildOrderNumber(index) {
   return `ORD-${String(2841 + index).padStart(4, '0')}`;
 }
 
-function getPlateBlocks(plate) {
-  const normalizedPlate = String(plate || '---').toUpperCase();
-  const first = normalizedPlate.slice(0, 3) || '---';
-  const second = normalizedPlate.slice(3) || '---';
-
-  return { first, second };
+function formatPlate(plate) {
+  return String(plate || '---').toUpperCase();
 }
 
 function buildOrders(vehicles, employees) {
-  const mechanics = employees.filter((employee) =>
-    String(employee.rol || '').toLowerCase().includes('mec'),
-  );
-
   return vehicles.map((vehicle, index) => {
-    const mechanic = mechanics[index % Math.max(mechanics.length, 1)];
-
     return {
       id: vehicle._id,
       orderNumber: buildOrderNumber(index),
@@ -77,7 +69,9 @@ function buildOrders(vehicles, employees) {
       plate: vehicle.matricula,
       vehicleName: `${vehicle.marca || ''} ${vehicle.modelo || ''}`.trim(),
       customerName: getCustomerName(vehicle.client_id),
-      mechanicName: getEmployeeName(mechanic),
+      customerEmail: vehicle.client_id?.email || '',
+      assignedMechanicId: vehicle.assigned_mechanic?._id || '',
+      mechanicName: getEmployeeName(vehicle.assigned_mechanic),
       status: getOrderStatus(vehicle),
       observations: vehicle.observaciones || 'Sin observaciones registradas',
       signatureUrl: vehicle.customer_signature?.url || '',
@@ -292,15 +286,38 @@ async function downloadPdfDocument({ title, subtitle, rows, filename, signatureU
   URL.revokeObjectURL(url);
 }
 
-function WorkOrderCard({ order, onDownloadPdf }) {
-  const plateBlocks = getPlateBlocks(order.plate);
+async function blobToBase64(blob) {
+  const buffer = await blob.arrayBuffer();
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+
+  return window.btoa(binary);
+}
+
+function WorkOrderCard({
+  order,
+  mechanicOptions,
+  statusOptions,
+  onAssignMechanic,
+  onChangeStatus,
+  onDownloadPdf,
+  onSendEmail,
+  isSendingEmail,
+  isUpdatingMechanic,
+  isUpdatingStatus,
+}) {
+  const formattedPlate = formatPlate(order.plate);
 
   return (
     <Card className='p-5 transition hover:border-blue-500/30 hover:bg-white/[0.03]'>
-      <div className='flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between'>
-        <div className='grid min-w-0 flex-1 gap-5 sm:grid-cols-[84px_1fr] lg:grid-cols-[84px_1fr_180px] lg:items-center'>
-          <div className='space-y-4'>
-            <div>
+      <div className='flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between'>
+        <div className='grid min-w-0 flex-1 gap-6 md:grid-cols-[172px_1fr] xl:grid-cols-[172px_minmax(0,1fr)_240px] xl:items-stretch'>
+          <div className='flex flex-col items-start gap-4 md:items-center xl:items-start'>
+            <div className='w-full text-left md:text-center xl:text-left'>
               <span className='inline-flex rounded-full border border-blue-500/30 bg-blue-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-widest text-blue-300'>
                 {order.orderNumber}
               </span>
@@ -309,13 +326,12 @@ function WorkOrderCard({ order, onDownloadPdf }) {
               </p>
             </div>
 
-            <div className='inline-flex min-h-16 min-w-20 flex-col justify-center rounded-2xl bg-[#1B2538] px-4 py-3 font-bold text-white'>
-              <span>{plateBlocks.first}</span>
-              <span>{plateBlocks.second}</span>
+            <div className='inline-flex min-h-16 w-full max-w-[156px] items-center justify-center self-start rounded-2xl bg-[#1B2538] px-4 py-3 font-bold text-white md:self-center xl:self-start'>
+              <span className='truncate text-lg leading-none tracking-normal'>{formattedPlate}</span>
             </div>
           </div>
 
-          <div className='min-w-0 space-y-4'>
+          <div className='min-w-0 space-y-5'>
             <div>
               <p className='text-2xl font-bold leading-tight text-white/80'>
                 {order.vehicleName || 'Vehiculo sin modelo'}
@@ -323,32 +339,61 @@ function WorkOrderCard({ order, onDownloadPdf }) {
               <p className='mt-1 text-sm text-white/45'>{order.observations}</p>
             </div>
 
-            <div className='grid gap-3 text-sm text-white/65 sm:grid-cols-2'>
+            <div className='grid gap-3 text-sm text-white/65'>
               <div className='flex items-center gap-3'>
                 <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-white/45'>
                   <Icon name='profile' className='h-4 w-4' />
                 </span>
                 <span className='truncate'>{order.customerName}</span>
               </div>
-              <div className='flex items-center gap-3'>
-                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-300'>
-                  <Icon name='wrench' className='h-4 w-4' />
-                </span>
-                <span className='truncate'>{order.mechanicName}</span>
-              </div>
             </div>
           </div>
 
-          <div className='flex lg:justify-center'>
-            <span
-              className={`inline-flex rounded-full border px-4 py-2 text-[11px] font-bold uppercase tracking-widest ${statusStyles[order.status]}`}
-            >
-              {order.status}
-            </span>
+          <div className='flex h-full flex-col justify-center space-y-4 xl:justify-self-end'>
+            <div className='space-y-2'>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/35'>
+                Mecánico
+              </p>
+              <div className='flex w-full min-w-[220px] items-center gap-3 rounded-2xl border border-white/10 bg-[#1B2538] px-3 py-2.5'>
+                <span className='flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-xs font-bold text-blue-300'>
+                  <Icon name='wrench' className='h-4 w-4' />
+                </span>
+                <select
+                  value={order.assignedMechanicId}
+                  onChange={(event) => onAssignMechanic(order, event.target.value)}
+                  disabled={isUpdatingMechanic}
+                  className='min-w-0 flex-1 appearance-none bg-transparent pr-7 text-sm font-medium text-white outline-none disabled:cursor-not-allowed disabled:opacity-60'
+                >
+                  {mechanicOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className='space-y-2'>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/35'>
+                Estado
+              </p>
+              <select
+                value={order.status}
+                onChange={(event) => onChangeStatus(order, event.target.value)}
+                disabled={isUpdatingStatus}
+                className={`w-full min-w-[220px] appearance-none rounded-2xl border px-4 py-3 text-sm font-medium outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${statusStyles[order.status]}`}
+              >
+                {statusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
-        <div className='flex items-center justify-end gap-2 text-white/45'>
+        <div className='flex items-center justify-end gap-2 self-end text-white/45 xl:self-center'>
           <button
             type='button'
             onClick={() => onDownloadPdf(order)}
@@ -360,11 +405,21 @@ function WorkOrderCard({ order, onDownloadPdf }) {
           </button>
           <button
             type='button'
-            className='flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/10 hover:text-white'
-            aria-label='Mas opciones'
-            title='Mas opciones'
+            onClick={() => onSendEmail(order)}
+            disabled={!order.customerEmail || isSendingEmail}
+            className={`flex h-10 w-10 items-center justify-center rounded-xl transition ${
+              order.customerEmail && !isSendingEmail
+                ? 'text-white/45 hover:bg-white/10 hover:text-white'
+                : 'cursor-not-allowed text-white/20'
+            }`}
+            aria-label='Enviar orden por email'
+            title={
+              order.customerEmail
+                ? 'Enviar orden por email'
+                : 'El cliente no tiene email registrado'
+            }
           >
-            <Icon name='more' className='h-5 w-5' />
+            <Icon name='mail' className={isSendingEmail ? 'h-5 w-5 animate-pulse' : 'h-5 w-5'} />
           </button>
           <Link
             to='/vehicles'
@@ -387,6 +442,9 @@ export default function WorkOrdersPage() {
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('Todos');
+  const [sendingOrderId, setSendingOrderId] = useState('');
+  const [updatingOrderId, setUpdatingOrderId] = useState('');
+  const [updatingStatusOrderId, setUpdatingStatusOrderId] = useState('');
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -412,6 +470,25 @@ export default function WorkOrdersPage() {
   }, []);
 
   const orders = useMemo(() => buildOrders(vehicles, employees), [vehicles, employees]);
+  const mechanics = useMemo(
+    () => employees.filter((employee) => String(employee.rol || '').toLowerCase().includes('mec')),
+    [employees],
+  );
+  const mechanicOptions = useMemo(
+    () => [
+      { value: '', label: 'Sin mecanico asignado' },
+      ...mechanics.map((employee) => ({
+        value: employee._id,
+        label: getEmployeeName(employee),
+      })),
+    ],
+    [mechanics],
+  );
+  const statusOptions = [
+    { value: 'Pendiente', label: 'Pendiente' },
+    { value: 'En proceso', label: 'En proceso' },
+    { value: 'Completada', label: 'Completada' },
+  ];
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -443,6 +520,44 @@ export default function WorkOrdersPage() {
     estado: order.status,
   });
 
+  const handleAssignMechanic = async (order, mechanicId) => {
+    setError('');
+    setUpdatingOrderId(order.id);
+
+    try {
+      const updatedVehicle = await updateVehicle(order.id, {
+        assigned_mechanic: mechanicId || null,
+      });
+
+      setVehicles((prev) =>
+        prev.map((vehicle) => (vehicle._id === order.id ? updatedVehicle : vehicle)),
+      );
+    } catch (updateError) {
+      setError(updateError.message);
+    } finally {
+      setUpdatingOrderId('');
+    }
+  };
+
+  const handleChangeStatus = async (order, status) => {
+    setError('');
+    setUpdatingStatusOrderId(order.id);
+
+    try {
+      const updatedVehicle = await updateVehicle(order.id, {
+        work_order_status: status,
+      });
+
+      setVehicles((prev) =>
+        prev.map((vehicle) => (vehicle._id === order.id ? updatedVehicle : vehicle)),
+      );
+    } catch (updateError) {
+      setError(updateError.message);
+    } finally {
+      setUpdatingStatusOrderId('');
+    }
+  };
+
   const handleExportOrderPdf = async (order) => {
     try {
       await downloadPdfDocument({
@@ -467,6 +582,37 @@ export default function WorkOrdersPage() {
       });
     } catch (downloadError) {
       setError(downloadError.message);
+    }
+  };
+
+  const handleSendOrderEmail = async (order) => {
+    if (!order.customerEmail) {
+      setError('El cliente de esta orden no tiene email registrado');
+      return;
+    }
+
+    setError('');
+    setSendingOrderId(order.id);
+
+    try {
+      const blob = await createPdfBlob({
+        title: `Orden de trabajo ${order.orderNumber}`,
+        subtitle: 'Exportación individual en PDF de la orden seleccionada.',
+        rows: [mapOrderToPdfRow(order)],
+        signatureUrl: order.signatureUrl,
+      });
+
+      const pdfBase64 = await blobToBase64(blob);
+
+      await sendWorkOrderEmail(order.id, {
+        pdfBase64,
+        filename: `${order.orderNumber.toLowerCase()}.pdf`,
+        orderNumber: order.orderNumber,
+      });
+    } catch (sendError) {
+      setError(sendError.message);
+    } finally {
+      setSendingOrderId('');
     }
   };
 
@@ -518,7 +664,15 @@ export default function WorkOrdersPage() {
             <WorkOrderCard
               key={order.id}
               order={order}
+              mechanicOptions={mechanicOptions}
+              statusOptions={statusOptions}
+              onAssignMechanic={handleAssignMechanic}
+              onChangeStatus={handleChangeStatus}
               onDownloadPdf={handleExportOrderPdf}
+              onSendEmail={handleSendOrderEmail}
+              isSendingEmail={sendingOrderId === order.id}
+              isUpdatingMechanic={updatingOrderId === order.id}
+              isUpdatingStatus={updatingStatusOrderId === order.id}
             />
           ))
         ) : (
