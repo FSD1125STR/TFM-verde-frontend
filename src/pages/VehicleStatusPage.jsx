@@ -1,15 +1,61 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { FOLDERS, uploadImage } from "../services/cloudinary.js";
+import { updateVehicle } from "../services/vehicleApi.js";
 
 export default function VehicleStatusPage() {
   const [notes, setNotes] = useState("");
   const [images, setImages] = useState([]);
+  const [submitError, setSubmitError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
+  const vehicleId = location.state?.vehicleId;
+  const clientId = location.state?.clientId;
 
   const handleImages = (e) => {
     const files = Array.from(e.target.files);
     setImages(files);
+  };
+
+  const handleContinue = async () => {
+    if (!vehicleId) {
+      setSubmitError("No se ha encontrado el vehículo creado.");
+      return;
+    }
+
+    setSubmitError("");
+    setIsSubmitting(true);
+
+    try {
+      const uploadedImages = await Promise.all(
+        images.map(async (file) => {
+          const uploadedFile = await uploadImage(file, "VEHICLE_RECEPTION");
+
+          return {
+            public_id: uploadedFile.public_id,
+            url: uploadedFile.url,
+          };
+        }),
+      );
+
+      await updateVehicle(vehicleId, {
+        observaciones: notes.trim(),
+        reception_images: uploadedImages,
+      });
+
+      navigate("/vehicle-signature", {
+        state: {
+          vehicleId,
+          clientId,
+        },
+      });
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -26,13 +72,13 @@ export default function VehicleStatusPage() {
 
       {/* Steps */}
       <div className="flex items-center gap-6 max-w-3xl">
-        {[1, 2, 3, 4].map((step) => (
+        {[1, 2, 3].map((step) => (
           <div
             key={step}
             className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${
-              step === 3
+              step === 2
                 ? "bg-blue-600 text-white"
-                : step < 3
+                : step < 2
                 ? "bg-blue-600/80 text-white"
                 : "bg-[#1F2937] text-white/40"
             }`}
@@ -53,6 +99,10 @@ export default function VehicleStatusPage() {
             ESTADO Y EVIDENCIAS
           </h2>
         </div>
+
+        {submitError ? (
+          <p className="text-sm text-red-400">{submitError}</p>
+        ) : null}
 
         {/* Upload */}
         <div>
@@ -111,17 +161,18 @@ export default function VehicleStatusPage() {
         {/* Buttons */}
         <div className="flex justify-between pt-6">
           <button
-            onClick={() => navigate("/client-info")}
+            onClick={() => navigate("/vehicle-reception")}
             className="text-white/60 hover:text-white"
           >
             Atrás
           </button>
 
           <button
-            onClick={() => navigate("/vehicle-signature")}
-            className="bg-blue-600 hover:bg-blue-700 px-8 py-3 rounded-xl"
+            onClick={handleContinue}
+            disabled={isSubmitting}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 px-8 py-3 rounded-xl"
           >
-            Continuar →
+            {isSubmitting ? "Guardando..." : "Continuar →"}
           </button>
         </div>
       </div>
