@@ -42,7 +42,7 @@ export default function Sidebar() {
     "Sesión iniciada";
 
   return (
-    <aside className="w-72 min-h-screen bg-[#0F172A] text-white flex flex-col justify-between px-5 py-6">
+    <aside className="w-72 h-screen shrink-0 bg-[#0F172A] text-white flex flex-col justify-between px-5 py-6">
       <div>
         <div className="flex items-center gap-4 mb-8">
           <div className="w-12 h-12 rounded-2xl bg-blue-600 flex items-center justify-center">
