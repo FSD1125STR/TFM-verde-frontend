@@ -57,6 +57,7 @@ export default function EmployeePage() {
   const [roles, setRoles] = useState([]);
   const [rolesLoading, setRolesLoading] = useState(true);
   const [rolesError, setRolesError] = useState('');
+  const [submitNotice, setSubmitNotice] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
@@ -138,6 +139,7 @@ export default function EmployeePage() {
     setEditingEmployee(null);
     setIsModalOpen(true);
     setSubmitError('');
+    setSubmitNotice('');
     setFormData({
       name: '',
       lastname: '',
@@ -154,6 +156,7 @@ export default function EmployeePage() {
     setEditingEmployee(employee);
     setIsModalOpen(true);
     setSubmitError('');
+    setSubmitNotice('');
     setFormData({
       name: employee.name ?? '',
       lastname: employee.lastname ?? '',
@@ -170,6 +173,7 @@ export default function EmployeePage() {
     setIsModalOpen(false);
     setEditingEmployee(null);
     setSubmitError('');
+    setSubmitNotice('');
     setFormData({
       name: '',
       lastname: '',
@@ -200,6 +204,7 @@ export default function EmployeePage() {
   const handleSubmitEmployee = async (e) => {
     e.preventDefault();
     setSubmitError('');
+    setSubmitNotice('');
 
     if (
       !formData.name.trim() ||
@@ -261,9 +266,35 @@ export default function EmployeePage() {
         });
 
         setEmployees((prev) => [...prev, newEmployee]);
+
+        if (newEmployee.emailInvitationSent) {
+          setSubmitNotice('Empleado creado y email de acceso enviado correctamente.');
+        } else if (newEmployee.emailInvitationSkipped) {
+          setSubmitNotice(
+            'Empleado creado. El email no se ha enviado porque el SMTP no está configurado en el backend.',
+          );
+        } else if (newEmployee.emailInvitationReason) {
+          setSubmitNotice(
+            `Empleado creado, pero el email no se pudo enviar: ${newEmployee.emailInvitationReason}`,
+          );
+        }
       }
 
-      closeModal();
+      if (editingEmployee) {
+        closeModal();
+      } else {
+        setEditingEmployee(null);
+        setFormData({
+          name: '',
+          lastname: '',
+          email: '',
+          password: '',
+          role: roles.length > 0 ? roles[0] : '',
+          profile_image: null,
+        });
+        setProfileImageFile(null);
+        setProfileImagePreview('');
+      }
     } catch (error) {
       setSubmitError(error.message);
     } finally {
@@ -484,6 +515,10 @@ export default function EmployeePage() {
         bodyClassName='max-h-[80vh] overflow-y-auto'
       >
         <form onSubmit={handleSubmitEmployee} className='space-y-5'>
+          {submitNotice ? (
+            <p className='text-sm text-emerald-300'>{submitNotice}</p>
+          ) : null}
+
           {submitError ? (
             <p className='text-sm text-red-400'>{submitError}</p>
           ) : null}
