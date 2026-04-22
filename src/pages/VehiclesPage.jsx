@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -83,6 +83,7 @@ const emptyFormData = {
 
 export default function VehiclesPage() {
   const { profile } = useContext(LoginContext);
+  const signatureCanvasRef = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const [vehicles, setVehicles] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -100,7 +101,10 @@ export default function VehiclesPage() {
   );
   const [formData, setFormData] = useState(emptyFormData);
   const [receptionImages, setReceptionImages] = useState([]);
+  const [signatureImage, setSignatureImage] = useState(null);
   const [newReceptionFiles, setNewReceptionFiles] = useState([]);
+  const [isDrawingSignature, setIsDrawingSignature] = useState(false);
+  const [hasNewSignature, setHasNewSignature] = useState(false);
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -187,8 +191,11 @@ export default function VehiclesPage() {
       observaciones: normalizedVehicle.observaciones ?? '',
     });
     setReceptionImages(normalizedVehicle.reception_images);
+    setSignatureImage(normalizedVehicle.customer_signature);
     setNewReceptionFiles([]);
     setSubmitError('');
+    setHasNewSignature(false);
+    clearSignatureCanvas();
   };
 
   const openEditModal = async (vehicle) => {
@@ -212,7 +219,10 @@ export default function VehiclesPage() {
     setSubmitError('');
     setFormData(emptyFormData);
     setReceptionImages([]);
+    setSignatureImage(null);
     setNewReceptionFiles([]);
+    setHasNewSignature(false);
+    clearSignatureCanvas();
     setIsModalOpen(false);
   };
 
@@ -242,6 +252,76 @@ export default function VehiclesPage() {
     }
   };
 
+  const getSignatureCoordinates = (event) => {
+    const canvas = signatureCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const pointer = event.touches ? event.touches[0] : event;
+
+    return {
+      x: (pointer.clientX - rect.left) * scaleX,
+      y: (pointer.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const startSignatureDrawing = (event) => {
+    event.preventDefault();
+
+    const canvas = signatureCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { x, y } = getSignatureCoordinates(event);
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    setIsDrawingSignature(true);
+  };
+
+  const drawSignature = (event) => {
+    if (!isDrawingSignature) return;
+    event.preventDefault();
+
+    const canvas = signatureCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { x, y } = getSignatureCoordinates(event);
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setHasNewSignature(true);
+  };
+
+  const stopSignatureDrawing = () => {
+    setIsDrawingSignature(false);
+  };
+
+  const clearSignatureCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setHasNewSignature(false);
+  };
+
+  const canvasToBlob = () =>
+    new Promise((resolve, reject) => {
+      const canvas = signatureCanvasRef.current;
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('No se pudo generar la firma.'));
+          return;
+        }
+
+        resolve(blob);
+      }, 'image/png');
+    });
+
   const handleSubmitVehicle = async (e) => {
     e.preventDefault();
     setSubmitError('');
@@ -266,6 +346,27 @@ export default function VehiclesPage() {
         newReceptionFiles.map((file) => uploadImage(file, 'VEHICLE_RECEPTION')),
       );
 
+      let nextSignature = signatureImage;
+      if (hasNewSignature) {
+        const signatureBlob = await canvasToBlob();
+        const signatureFile = new File([signatureBlob], 'signature.png', {
+          type: 'image/png',
+        });
+        const uploadedSignature = await uploadImage(
+          signatureFile,
+          'VEHICLE_SIGNATURES',
+        );
+
+        if (signatureImage?.public_id) {
+          await deleteImage(signatureImage.public_id, 'VEHICLE_SIGNATURES');
+        }
+
+        nextSignature = {
+          public_id: uploadedSignature.public_id,
+          url: uploadedSignature.url,
+        };
+      }
+
       const updatedVehicle = await updateVehicle(editingVehicle._id, {
         client_id: formData.client_id,
         matricula: formData.matricula.trim().toUpperCase(),
@@ -283,6 +384,7 @@ export default function VehiclesPage() {
             url: image.url,
           })),
         ],
+        customer_signature: nextSignature,
       });
 
       setVehicles((prev) =>
@@ -292,6 +394,7 @@ export default function VehiclesPage() {
             : vehicle,
         ),
       );
+      setSignatureImage(nextSignature);
       closeModal();
     } catch (error) {
       setSubmitError(error.message);
@@ -418,7 +521,7 @@ export default function VehiclesPage() {
                             <img
                               src={vehicle.customer_signature.url}
                               alt='Firma'
-                              className='h-12 w-20 rounded-lg object-cover border border-white/10 bg-white'
+                              className='h-12 w-20 rounded-lg object-cover border border-white/10'
                             />
                           ) : (
                             <div className='h-12 w-20 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 text-xs'>
@@ -617,6 +720,62 @@ export default function VehiclesPage() {
                 {newReceptionFiles.length > 0 ? (
                   <p className='text-xs text-white/50'>
                     {newReceptionFiles.length} archivo(s) listo(s) para subir.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-3'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Firma
+                </p>
+
+                {signatureImage ? (
+                  <div className='space-y-3'>
+                    <img
+                      src={signatureImage.url}
+                      alt='Firma'
+                      className='h-28 w-full rounded-xl object-contain border border-white/10 p-2'
+                    />
+                    <p className='text-xs text-white/50'>
+                      Dibuja una nueva firma en el canvas para reemplazar la
+                      actual al guardar.
+                    </p>
+                  </div>
+                ) : (
+                  <p className='text-sm text-white/50'>
+                    No hay firma guardada. Puedes dibujarla abajo.
+                  </p>
+                )}
+
+                <div className='flex justify-end'>
+                  <button
+                    type='button'
+                    onClick={clearSignatureCanvas}
+                    className='px-3 py-2 rounded-xl bg-[#1F2937] text-xs text-white/70 hover:text-white'
+                  >
+                    Limpiar firma
+                  </button>
+                </div>
+
+                <div className='rounded-2xl border border-white/10 bg-[#172033] p-3'>
+                  <canvas
+                    ref={signatureCanvasRef}
+                    width={700}
+                    height={180}
+                    className='w-full h-[180px] rounded-xl cursor-crosshair'
+                    onMouseDown={startSignatureDrawing}
+                    onMouseMove={drawSignature}
+                    onMouseUp={stopSignatureDrawing}
+                    onMouseLeave={stopSignatureDrawing}
+                    onTouchStart={startSignatureDrawing}
+                    onTouchMove={drawSignature}
+                    onTouchEnd={stopSignatureDrawing}
+                  />
+                </div>
+
+                {hasNewSignature ? (
+                  <p className='text-xs text-emerald-400'>
+                    La nueva firma se guardará al pulsar `Actualizar`.
                   </p>
                 ) : null}
               </div>

@@ -67,7 +67,9 @@ const deleteImage = async (public_id, folder) => {
   }
 
   try {
-    const normalizedPublicId = public_id.replace(`Nuclio/${FOLDERS[folder]}/`, '');
+    const normalizedPublicId = public_id
+      .replace(/^Nuclio\/[^/]+\//i, '')
+      .replace(/^\/+|\/+$/g, '');
     const res = await fetch(
       `${API_BASE_URL}/cloudinary/images/${FOLDERS[folder]}/${normalizedPublicId}`,
       { method: 'DELETE' },
