@@ -51,9 +51,17 @@ export default function ProfilePage() {
             return (
               <div className="rounded-3xl border border-white/10 bg-[#0F172A] p-8 shadow-2xl">
                 <div className="flex items-center gap-4 mb-8">
-                  <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl">
-                    👤
-                  </div>
+                  {profile.employee.profile_image?.url ? (
+                    <img
+                      src={profile.employee.profile_image.url}
+                      alt={displayName}
+                      className="w-14 h-14 rounded-2xl object-cover border border-white/10"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-2xl">
+                      👤
+                    </div>
+                  )}
 
                   <div>
                     <h2 className="text-2xl font-bold">{displayName}</h2>

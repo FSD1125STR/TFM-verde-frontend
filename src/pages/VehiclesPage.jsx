@@ -11,6 +11,7 @@ import { deleteImage, uploadImage } from '../services/cloudinary.js';
 import { getCustomers } from '../services/customerApi.js';
 import {
   deleteVehicle,
+  getVehicleById,
   getVehicles,
   updateVehicle,
 } from '../services/vehicleApi.js';
@@ -30,6 +31,42 @@ function getCustomerIdentifier(customer) {
   if (!customer) return '-';
 
   return customer.cif || customer.dni || '-';
+}
+
+function normalizeAsset(asset) {
+  if (!asset || typeof asset !== 'object') return null;
+
+  if (asset.public_id && asset.url) {
+    return {
+      public_id: asset.public_id,
+      url: asset.url,
+    };
+  }
+
+  if (asset.type?.public_id && asset.type?.url) {
+    return {
+      public_id: asset.type.public_id,
+      url: asset.type.url,
+    };
+  }
+
+  return null;
+}
+
+function normalizeAssetList(assets) {
+  if (!Array.isArray(assets)) return [];
+
+  return assets.map(normalizeAsset).filter(Boolean);
+}
+
+function normalizeVehicleMedia(vehicle) {
+  if (!vehicle || typeof vehicle !== 'object') return vehicle;
+
+  return {
+    ...vehicle,
+    reception_images: normalizeAssetList(vehicle.reception_images),
+    customer_signature: normalizeAsset(vehicle.customer_signature),
+  };
 }
 
 const emptyFormData = {
@@ -54,8 +91,11 @@ export default function VehiclesPage() {
   const [vehiclesError, setVehiclesError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingVehicleDetail, setIsLoadingVehicleDetail] = useState(false);
   const [deletingVehicleId, setDeletingVehicleId] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(
@@ -78,7 +118,7 @@ export default function VehiclesPage() {
           getVehicles(),
           getCustomers(),
         ]);
-        setVehicles(vehiclesData);
+        setVehicles(vehiclesData.map(normalizeVehicleMedia));
         setCustomers(customersData);
       } catch (error) {
         setVehiclesError(error.message);
@@ -135,25 +175,62 @@ export default function VehiclesPage() {
     });
   }, [vehicles, search, selectedCustomer]);
 
-  const openEditModal = (vehicle) => {
-    setEditingVehicle(vehicle);
-    setSubmitError('');
+  const hydrateEditModal = (vehicle) => {
+    const normalizedVehicle = normalizeVehicleMedia(vehicle);
+
+    setEditingVehicle(normalizedVehicle);
     setFormData({
-      client_id: vehicle.client_id?._id ?? '',
-      matricula: vehicle.matricula ?? '',
-      n_bastidor: vehicle.n_bastidor ?? '',
-      marca: vehicle.marca ?? '',
-      modelo: vehicle.modelo ?? '',
-      tipo_combustible: vehicle.tipo_combustible ?? '',
-      cantidad_combustible: String(vehicle.cantidad_combustible ?? 0),
-      year: vehicle.year ? new Date(vehicle.year).getFullYear().toString() : '',
-      observaciones: vehicle.observaciones ?? '',
+      client_id: normalizedVehicle.client_id?._id ?? '',
+      matricula: normalizedVehicle.matricula ?? '',
+      n_bastidor: normalizedVehicle.n_bastidor ?? '',
+      marca: normalizedVehicle.marca ?? '',
+      modelo: normalizedVehicle.modelo ?? '',
+      tipo_combustible: normalizedVehicle.tipo_combustible ?? '',
+      cantidad_combustible: String(normalizedVehicle.cantidad_combustible ?? 0),
+      year: normalizedVehicle.year
+        ? new Date(normalizedVehicle.year).getFullYear().toString()
+        : '',
+      observaciones: normalizedVehicle.observaciones ?? '',
     });
-    setReceptionImages(vehicle.reception_images ?? []);
-    setSignatureImage(vehicle.customer_signature ?? null);
+    setReceptionImages(normalizedVehicle.reception_images);
+    setSignatureImage(normalizedVehicle.customer_signature);
     setNewReceptionFiles([]);
+    setSubmitError('');
     setHasNewSignature(false);
+    clearSignatureCanvas();
+  };
+
+  const openEditModal = async (vehicle) => {
     setIsModalOpen(true);
+
+    hydrateEditModal(vehicle);
+    setIsLoadingVehicleDetail(true);
+
+    try {
+      const vehicleDetail = await getVehicleById(vehicle._id);
+      hydrateEditModal(vehicleDetail);
+    } catch (error) {
+      setSubmitError(error.message);
+    } finally {
+      setIsLoadingVehicleDetail(false);
+    }
+  };
+
+  const openEvidenceModal = async (vehicle) => {
+    setIsEvidenceModalOpen(true);
+    setSelectedVehicle(normalizeVehicleMedia(vehicle));
+
+    try {
+      const vehicleDetail = await getVehicleById(vehicle._id);
+      setSelectedVehicle(normalizeVehicleMedia(vehicleDetail));
+    } catch (error) {
+      setVehiclesError(error.message);
+    }
+  };
+
+  const closeEvidenceModal = () => {
+    setSelectedVehicle(null);
+    setIsEvidenceModalOpen(false);
   };
 
   const closeModal = () => {
@@ -164,6 +241,7 @@ export default function VehiclesPage() {
     setSignatureImage(null);
     setNewReceptionFiles([]);
     setHasNewSignature(false);
+    clearSignatureCanvas();
     setIsModalOpen(false);
   };
 
@@ -188,18 +266,6 @@ export default function VehiclesPage() {
       setReceptionImages((prev) =>
         prev.filter((item) => item.public_id !== image.public_id),
       );
-    } catch (error) {
-      setSubmitError(error.message);
-    }
-  };
-
-  const handleRemoveSignature = async () => {
-    if (!signatureImage) return;
-    if (!window.confirm('Eliminar la firma guardada?')) return;
-
-    try {
-      await deleteImage(signatureImage.public_id, 'VEHICLE_SIGNATURES');
-      setSignatureImage(null);
     } catch (error) {
       setSubmitError(error.message);
     }
@@ -254,6 +320,7 @@ export default function VehiclesPage() {
 
   const clearSignatureCanvas = () => {
     const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
     const ctx = canvas.getContext('2d');
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -300,10 +367,6 @@ export default function VehiclesPage() {
 
       let nextSignature = signatureImage;
       if (hasNewSignature) {
-        if (signatureImage?.public_id) {
-          await deleteImage(signatureImage.public_id, 'VEHICLE_SIGNATURES');
-        }
-
         const signatureBlob = await canvasToBlob();
         const signatureFile = new File([signatureBlob], 'signature.png', {
           type: 'image/png',
@@ -312,6 +375,11 @@ export default function VehiclesPage() {
           signatureFile,
           'VEHICLE_SIGNATURES',
         );
+
+        if (signatureImage?.public_id) {
+          await deleteImage(signatureImage.public_id, 'VEHICLE_SIGNATURES');
+        }
+
         nextSignature = {
           public_id: uploadedSignature.public_id,
           url: uploadedSignature.url,
@@ -340,10 +408,12 @@ export default function VehiclesPage() {
 
       setVehicles((prev) =>
         prev.map((vehicle) =>
-          vehicle._id === editingVehicle._id ? updatedVehicle : vehicle,
+          vehicle._id === editingVehicle._id
+            ? normalizeVehicleMedia(updatedVehicle)
+            : vehicle,
         ),
       );
-      clearSignatureCanvas();
+      setSignatureImage(nextSignature);
       closeModal();
     } catch (error) {
       setSubmitError(error.message);
@@ -380,19 +450,36 @@ export default function VehiclesPage() {
             <p className='text-sm text-red-400'>{vehiclesError}</p>
           ) : null}
 
-          <div className='flex flex-col gap-3 lg:flex-row'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                Filtros
+              </p>
+              <p className='mt-1 text-sm text-white/50'>
+                Busca por vehiculo o limita el listado a un cliente concreto.
+              </p>
+            </div>
+
+            <p className='text-sm text-white/50'>
+              {filteredVehicles.length} vehiculo(s)
+            </p>
+          </div>
+
+          <div className='grid gap-4 lg:grid-cols-[1.4fr_0.9fr]'>
             <Input
+              label='Busqueda'
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='Buscar por matricula, marca, modelo o cliente...'
-              className='border-0'
+              placeholder='Matricula, marca, modelo, cliente...'
+              className='border-white/10 bg-[#111827]'
             />
 
             <Select
+              label='Cliente'
               value={selectedCustomer}
               onChange={(e) => setSelectedCustomer(e.target.value)}
               options={customerOptions}
-              className='border-0 lg:w-80'
+              className='border-white/10 bg-[#111827]'
             />
           </div>
         </Card>
@@ -448,31 +535,38 @@ export default function VehiclesPage() {
                       </td>
 
                       <td className='px-6 py-4'>
-                        <div className='flex items-center gap-2'>
-                          {vehicle.reception_images?.[0] ? (
-                            <img
-                              src={vehicle.reception_images[0].url}
-                              alt='Recepcion'
-                              className='h-12 w-12 rounded-lg object-cover border border-white/10'
-                            />
-                          ) : (
-                            <div className='h-12 w-12 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 text-xs'>
-                              Foto
-                            </div>
-                          )}
+                        <button
+                          type='button'
+                          onClick={() => openEvidenceModal(vehicle)}
+                          className='w-full rounded-2xl border border-white/10 bg-white/5 p-4 text-left transition hover:border-blue-500/40 hover:bg-white/10'
+                        >
+                          <div className='flex items-start justify-between gap-3'>
+                            <div className='space-y-3'>
+                              <p className='text-xs font-bold uppercase tracking-widest text-white/40'>
+                                Evidencias
+                              </p>
 
-                          {vehicle.customer_signature?.url ? (
-                            <img
-                              src={vehicle.customer_signature.url}
-                              alt='Firma'
-                              className='h-12 w-20 rounded-lg object-cover border border-white/10 bg-white'
-                            />
-                          ) : (
-                            <div className='h-12 w-20 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/40 text-xs'>
-                              Firma
+                              <div className='flex flex-wrap gap-2 text-xs'>
+                                <span className='rounded-full bg-[#111827] px-3 py-1 text-white/80'>
+                                  {vehicle.reception_images.length} foto(s)
+                                </span>
+                                <span className='rounded-full bg-[#111827] px-3 py-1 text-white/80'>
+                                  {vehicle.customer_signature
+                                    ? 'Firma disponible'
+                                    : 'Sin firma'}
+                                </span>
+                              </div>
+
+                              <p className='text-sm text-white/70'>
+                                Abrir galeria y firma
+                              </p>
                             </div>
-                          )}
-                        </div>
+
+                            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/15 text-blue-300'>
+                              →
+                            </div>
+                          </div>
+                        </button>
                       </td>
 
                       <td className='px-6 py-4'>
@@ -518,6 +612,82 @@ export default function VehiclesPage() {
       </section>
 
       <Modal
+        isOpen={isEvidenceModalOpen}
+        title='Evidencias del Vehiculo'
+        onClose={closeEvidenceModal}
+        panelClassName='md:min-w-[50vw] max-w-5xl'
+        bodyClassName='max-h-[80vh] overflow-y-auto'
+      >
+        <div className='space-y-6'>
+          {selectedVehicle ? (
+            <>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Vehiculo
+                </p>
+                <p className='mt-2 text-white'>
+                  {selectedVehicle.marca} {selectedVehicle.modelo} ·{' '}
+                  {selectedVehicle.matricula}
+                </p>
+                <p className='text-sm text-white/50'>
+                  {getCustomerDisplayName(selectedVehicle.client_id)}
+                </p>
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Fotos de recepcion
+                </p>
+
+                {selectedVehicle.reception_images.length > 0 ? (
+                  <div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+                    {selectedVehicle.reception_images.map((image) => (
+                      <img
+                        key={image.public_id}
+                        src={image.url}
+                        alt='Recepcion'
+                        className='h-48 w-full rounded-2xl object-cover border border-white/10'
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <p className='text-sm text-white/50'>
+                    No hay fotos guardadas.
+                  </p>
+                )}
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Firma
+                </p>
+
+                {selectedVehicle.customer_signature ? (
+                  <img
+                    src={selectedVehicle.customer_signature.url}
+                    alt='Firma'
+                    className='h-40 w-full rounded-2xl object-contain border border-white/10 p-3'
+                  />
+                ) : (
+                  <p className='text-sm text-white/50'>
+                    No hay firma guardada.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <p className='text-sm text-white/50'>Cargando evidencias...</p>
+          )}
+
+          <div className='flex justify-end'>
+            <Button type='button' variant='secondary' onClick={closeEvidenceModal}>
+              Cerrar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
         isOpen={isModalOpen}
         title='Editar Vehiculo'
         onClose={closeModal}
@@ -525,6 +695,12 @@ export default function VehiclesPage() {
         bodyClassName='max-h-[80vh] overflow-y-auto'
       >
         <form onSubmit={handleSubmitVehicle} className='space-y-6'>
+          {isLoadingVehicleDetail ? (
+            <p className='text-sm text-white/50'>
+              Cargando datos completos del vehículo...
+            </p>
+          ) : null}
+
           {submitError ? (
             <p className='text-sm text-red-400'>{submitError}</p>
           ) : null}
@@ -622,30 +798,30 @@ export default function VehiclesPage() {
                   Fotos de recepcion
                 </p>
 
-                <div className='grid grid-cols-3 gap-3'>
-                  {receptionImages.map((image) => (
-                    <div key={image.public_id} className='relative'>
-                      <img
-                        src={image.url}
-                        alt='Recepcion'
-                        className='h-20 w-full rounded-xl object-cover border border-white/10'
-                      />
-                      <button
-                        type='button'
-                        onClick={() => handleRemoveReceptionImage(image)}
-                        className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
-                      >
-                        x
-                      </button>
-                    </div>
-                  ))}
-                </div>
-
                 {receptionImages.length === 0 ? (
                   <p className='text-sm text-white/50'>
                     No hay fotos guardadas.
                   </p>
-                ) : null}
+                ) : (
+                  <div className='grid grid-cols-2 gap-3'>
+                    {receptionImages.map((image) => (
+                      <div key={image.public_id} className='relative'>
+                        <img
+                          src={image.url}
+                          alt='Recepcion'
+                          className='h-28 w-full rounded-xl object-cover border border-white/10'
+                        />
+                        <button
+                          type='button'
+                          onClick={() => handleRemoveReceptionImage(image)}
+                          className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
+                        >
+                          x
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <input
                   type='file'
@@ -668,38 +844,30 @@ export default function VehiclesPage() {
                 </p>
 
                 {signatureImage ? (
-                  <div className='relative inline-block'>
+                  <div className='space-y-3'>
                     <img
                       src={signatureImage.url}
                       alt='Firma'
-                      className='h-24 w-40 rounded-xl object-cover border border-white/10 bg-white'
+                      className='h-28 w-full rounded-xl object-contain border border-white/10 p-2'
                     />
-                    <button
-                      type='button'
-                      onClick={handleRemoveSignature}
-                      className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
-                    >
-                      x
-                    </button>
+                    <p className='text-xs text-white/50'>
+                      Dibuja una nueva firma en el canvas para reemplazar la
+                      actual al guardar.
+                    </p>
                   </div>
                 ) : (
                   <p className='text-sm text-white/50'>
-                    No hay firma guardada.
+                    No hay firma guardada. Puedes dibujarla abajo.
                   </p>
                 )}
 
-                <div className='flex items-center justify-between'>
-                  <p className='text-xs text-white/50'>
-                    Dibuja una nueva firma en el canvas para reemplazar la
-                    actual.
-                  </p>
-
+                <div className='flex justify-end'>
                   <button
                     type='button'
                     onClick={clearSignatureCanvas}
                     className='px-3 py-2 rounded-xl bg-[#1F2937] text-xs text-white/70 hover:text-white'
                   >
-                    Limpiar canvas
+                    Limpiar firma
                   </button>
                 </div>
 
@@ -721,8 +889,7 @@ export default function VehiclesPage() {
 
                 {hasNewSignature ? (
                   <p className='text-xs text-emerald-400'>
-                    Se guardara la nueva firma dibujada al actualizar el
-                    vehiculo.
+                    La nueva firma se guardará al pulsar `Actualizar`.
                   </p>
                 ) : null}
               </div>

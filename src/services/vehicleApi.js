@@ -22,6 +22,25 @@ export const getVehicles = async () => {
   return responseData.vehicles ?? [];
 };
 
+export const getVehicleById = async (vehicleId) => {
+  const response = await fetch(`${API_BASE_URL}/vehicle/${vehicleId}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeaders(),
+    },
+    credentials: 'include',
+  });
+
+  const responseData = await response.json();
+
+  if (!response.ok) {
+    throw new Error(responseData.message || 'Error al cargar vehículo');
+  }
+
+  return responseData.vehicle;
+};
+
 export const createVehicle = async (vehicleData) => {
   const response = await fetch(`${API_BASE_URL}/vehicle`, {
     method: 'POST',

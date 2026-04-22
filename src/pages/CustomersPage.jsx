@@ -7,6 +7,7 @@ import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
 import Card from '../components/ui/Card';
 import { LoginContext } from '../contexts/AuthContext';
+import { deleteImage, uploadImage } from '../services/cloudinary.js';
 import {
   createCustomer,
   deleteCustomer,
@@ -40,6 +41,7 @@ const emptyFormData = {
   Tfprin: '',
   Tf_sec: '',
   email: '',
+  profile_image: null,
   direccion: '',
   poblacion: '',
   CP: '',
@@ -62,6 +64,8 @@ export default function CustomersPage() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('Todos');
   const [formData, setFormData] = useState(emptyFormData);
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [profileImagePreview, setProfileImagePreview] = useState('');
 
   useEffect(() => {
     const fetchCustomers = async () => {
@@ -100,6 +104,8 @@ export default function CustomersPage() {
     setEditingCustomer(null);
     setSubmitError('');
     setFormData(emptyFormData);
+    setProfileImageFile(null);
+    setProfileImagePreview('');
     setIsModalOpen(true);
   };
 
@@ -116,12 +122,15 @@ export default function CustomersPage() {
       Tfprin: customer.Tfprin ?? '',
       Tf_sec: customer.Tf_sec ?? '',
       email: customer.email ?? '',
+      profile_image: customer.profile_image ?? null,
       direccion: customer.direccion ?? '',
       poblacion: customer.poblacion ?? '',
       CP: customer.CP ?? '',
       Pais: customer.Pais ?? '',
       provincia: customer.provincia ?? '',
     });
+    setProfileImageFile(null);
+    setProfileImagePreview(customer.profile_image?.url ?? '');
     setIsModalOpen(true);
   };
 
@@ -129,6 +138,8 @@ export default function CustomersPage() {
     setEditingCustomer(null);
     setSubmitError('');
     setFormData(emptyFormData);
+    setProfileImageFile(null);
+    setProfileImagePreview('');
     setIsModalOpen(false);
   };
 
@@ -154,6 +165,14 @@ export default function CustomersPage() {
 
       return nextFormData;
     });
+  };
+
+  const handleProfileImageChange = (e) => {
+    const file = e.target.files?.[0] ?? null;
+    setProfileImageFile(file);
+    setProfileImagePreview(
+      file ? URL.createObjectURL(file) : formData.profile_image?.url ?? '',
+    );
   };
 
   const handleSubmitCustomer = async (e) => {
@@ -182,6 +201,7 @@ export default function CustomersPage() {
       Tfprin: formData.Tfprin.trim(),
       Tf_sec: formData.Tf_sec.trim(),
       email: formData.email.trim(),
+      profile_image: formData.profile_image ?? null,
       direccion: formData.direccion.trim(),
       poblacion: formData.poblacion.trim(),
       CP: formData.CP.trim(),
@@ -195,8 +215,27 @@ export default function CustomersPage() {
     };
 
     try {
+      if (profileImageFile) {
+        const uploadedImage = await uploadImage(profileImageFile, 'PROFILES');
+        payload.profile_image = {
+          public_id: uploadedImage.public_id,
+          url: uploadedImage.url,
+        };
+      }
+
       if (editingCustomer) {
         const updatedCustomer = await updateCustomer(editingCustomer._id, payload);
+
+        if (
+          profileImageFile &&
+          editingCustomer.profile_image?.public_id &&
+          editingCustomer.profile_image.public_id !== payload.profile_image?.public_id
+        ) {
+          try {
+            await deleteImage(editingCustomer.profile_image.public_id, 'PROFILES');
+          } catch (_error) {}
+        }
+
         setCustomers((prev) =>
           prev.map((customer) =>
             customer._id === editingCustomer._id ? updatedCustomer : customer,
@@ -248,15 +287,32 @@ export default function CustomersPage() {
             <p className='text-sm text-red-400'>{customersError}</p>
           ) : null}
 
-          <div className='flex flex-col gap-3 lg:flex-row'>
+          <div className='flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between'>
+            <div>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                Filtros
+              </p>
+              <p className='mt-1 text-sm text-white/50'>
+                Busca por cliente o limita el listado por tipo.
+              </p>
+            </div>
+
+            <p className='text-sm text-white/50'>
+              {filteredCustomers.length} cliente(s)
+            </p>
+          </div>
+
+          <div className='grid gap-4 lg:grid-cols-[1.3fr_0.8fr]'>
             <Input
+              label='Busqueda'
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder='Buscar por nombre, DNI/CIF o email...'
-              className='border-0'
+              placeholder='Nombre, DNI/CIF o email...'
+              className='border-white/10 bg-[#111827]'
             />
 
             <Select
+              label='Tipo'
               value={typeFilter}
               onChange={(e) => setTypeFilter(e.target.value)}
               options={[
@@ -264,7 +320,7 @@ export default function CustomersPage() {
                 { value: 'Particular', label: 'Particular' },
                 { value: 'Empresa', label: 'Empresa' },
               ]}
-              className='border-0 lg:w-52'
+              className='border-white/10 bg-[#111827]'
             />
           </div>
         </Card>
@@ -293,48 +349,77 @@ export default function CustomersPage() {
                   filteredCustomers.map((customer) => (
                     <tr
                       key={customer._id}
-                      className='border-t border-white/5 hover:bg-white/2'
+                      className='border-t border-white/5 align-top hover:bg-white/[0.03]'
                     >
                       <td className='px-6 py-4'>
-                        <div className='flex items-center gap-3'>
-                          <div className='w-10 h-10 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-300 font-semibold'>
-                            {getInitials(customer.displayName)}
-                          </div>
+                        <div className='rounded-2xl border border-white/6 bg-white/[0.03] p-4'>
+                          <div className='flex items-center gap-3'>
+                            {customer.profile_image?.url ? (
+                              <img
+                                src={customer.profile_image.url}
+                                alt={customer.displayName}
+                                className='h-11 w-11 rounded-full border border-blue-500/30 object-cover'
+                              />
+                            ) : (
+                              <div className='flex h-11 w-11 items-center justify-center rounded-full border border-blue-500/30 bg-blue-600/20 font-semibold text-blue-300'>
+                                {getInitials(customer.displayName)}
+                              </div>
+                            )}
 
-                          <div>
-                            <p className='font-medium text-white'>
-                              {customer.displayName}
-                            </p>
-                            <p className='text-white/50 text-xs'>
-                              {customer.identifier}
-                            </p>
+                            <div className='min-w-0'>
+                              <p className='font-medium text-white'>
+                                {customer.displayName}
+                              </p>
+                              <p className='truncate text-xs text-white/50'>
+                                {customer.identifier}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </td>
 
                       <td className='px-6 py-4'>
-                        <span
-                          className={`px-3 py-1 rounded-full text-xs font-medium ${getCustomerTypeBadge(
-                            customer.type,
-                          )}`}
-                        >
-                          {customer.type === 'COMPANY' ? 'Empresa' : 'Particular'}
-                        </span>
+                        <div className='rounded-2xl border border-white/6 bg-white/[0.03] p-4'>
+                          <p className='text-[11px] font-bold uppercase tracking-widest text-white/35'>
+                            Perfil
+                          </p>
+                          <span
+                            className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-medium ${getCustomerTypeBadge(
+                              customer.type,
+                            )}`}
+                          >
+                            {customer.type === 'COMPANY' ? 'Empresa' : 'Particular'}
+                          </span>
+                        </div>
                       </td>
 
                       <td className='px-6 py-4'>
-                        <p>{customer.Tfprin}</p>
-                        <p className='text-white/50 text-xs'>{customer.email || '-'}</p>
+                        <div className='rounded-2xl border border-white/6 bg-white/[0.03] p-4'>
+                          <p className='text-[11px] font-bold uppercase tracking-widest text-white/35'>
+                            Contacto
+                          </p>
+                          <p className='mt-3 text-white'>{customer.Tfprin}</p>
+                          <p className='truncate text-xs text-white/50'>
+                            {customer.email || '-'}
+                          </p>
+                        </div>
                       </td>
 
                       <td className='px-6 py-4'>
-                        <p>{customer.poblacion || '-'}</p>
-                        <p className='text-white/50 text-xs'>{customer.provincia || '-'}</p>
+                        <div className='rounded-2xl border border-white/6 bg-white/[0.03] p-4'>
+                          <p className='text-[11px] font-bold uppercase tracking-widest text-white/35'>
+                            Ubicación
+                          </p>
+                          <p className='mt-3 text-white'>{customer.poblacion || '-'}</p>
+                          <p className='text-xs text-white/50'>
+                            {customer.provincia || '-'}
+                          </p>
+                        </div>
                       </td>
 
                       <td className='px-6 py-4 text-right'>
                         {profile.employee.rol === 'ADMIN' ? (
-                          <div className='flex justify-end gap-2'>
+                          <div className='flex flex-wrap justify-end gap-2'>
                             <Button
                               variant='secondary'
                               onClick={() =>
@@ -381,131 +466,188 @@ export default function CustomersPage() {
         isOpen={isModalOpen}
         title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
         onClose={closeModal}
+        panelClassName='md:min-w-[58vw] max-w-6xl'
+        bodyClassName='max-h-[80vh] overflow-y-auto'
       >
         <form onSubmit={handleSubmitCustomer} className='space-y-5'>
           {submitError ? (
             <p className='text-sm text-red-400'>{submitError}</p>
           ) : null}
 
-          {editingCustomer ? (
-            <div>
-              <label className='mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40'>
-                Tipo de cliente
-              </label>
+          <div className='grid gap-6 xl:grid-cols-[1.1fr_0.9fr]'>
+            <div className='space-y-6'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Identidad
+                </p>
 
-              <div className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white/70'>
-                {formData.type === 'COMPANY' ? 'Compañía' : 'Particular'}
+                {editingCustomer ? (
+                  <div>
+                    <label className='mb-2 block text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                      Tipo de cliente
+                    </label>
+
+                    <div className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white/70'>
+                      {formData.type === 'COMPANY' ? 'Compañía' : 'Particular'}
+                    </div>
+                  </div>
+                ) : (
+                  <Select
+                    label='Tipo de cliente'
+                    name='type'
+                    value={formData.type}
+                    onChange={handleChange}
+                    options={[
+                      { value: 'PRIVATE', label: 'Particular' },
+                      { value: 'COMPANY', label: 'Compañía' },
+                    ]}
+                  />
+                )}
+
+                {isCompany ? (
+                  <div className='grid gap-4 md:grid-cols-2'>
+                    <Input
+                      label='CIF'
+                      name='cif'
+                      value={formData.cif}
+                      onChange={handleChange}
+                    />
+
+                    <Input
+                      label='Nombre de la compañía'
+                      name='company_name'
+                      value={formData.company_name}
+                      onChange={handleChange}
+                    />
+                  </div>
+                ) : (
+                  <div className='grid gap-4 md:grid-cols-3'>
+                    <Input
+                      label='DNI'
+                      name='dni'
+                      value={formData.dni}
+                      onChange={handleChange}
+                    />
+
+                    <Input
+                      label='Nombre'
+                      name='name'
+                      value={formData.name}
+                      onChange={handleChange}
+                    />
+
+                    <Input
+                      label='Apellidos'
+                      name='lastname'
+                      value={formData.lastname}
+                      onChange={handleChange}
+                    />
+                  </div>
+                )}
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Contacto
+                </p>
+
+                <div className='grid gap-4 md:grid-cols-3'>
+                  <Input
+                    label='Teléfono principal'
+                    name='Tfprin'
+                    value={formData.Tfprin}
+                    onChange={handleChange}
+                  />
+
+                  <Input
+                    label='Teléfono secundario'
+                    name='Tf_sec'
+                    value={formData.Tf_sec}
+                    onChange={handleChange}
+                  />
+
+                  <Input
+                    label='Email'
+                    name='email'
+                    value={formData.email}
+                    onChange={handleChange}
+                  />
+                </div>
               </div>
             </div>
-          ) : (
-            <Select
-              label='Tipo de cliente'
-              name='type'
-              value={formData.type}
-              onChange={handleChange}
-              options={[
-                { value: 'PRIVATE', label: 'Particular' },
-                { value: 'COMPANY', label: 'Compañía' },
-              ]}
-            />
-          )}
 
-          {isCompany ? (
-            <>
-              <Input
-                label='CIF'
-                name='cif'
-                value={formData.cif}
-                onChange={handleChange}
-              />
+            <div className='space-y-6'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Perfil
+                </p>
 
-              <Input
-                label='Nombre de la compañía'
-                name='company_name'
-                value={formData.company_name}
-                onChange={handleChange}
-              />
-            </>
-          ) : (
-            <>
-              <Input
-                label='DNI'
-                name='dni'
-                value={formData.dni}
-                onChange={handleChange}
-              />
+                <div className='flex items-center gap-4'>
+                  {profileImagePreview ? (
+                    <img
+                      src={profileImagePreview}
+                      alt='Previsualizacion'
+                      className='h-16 w-16 rounded-full object-cover border border-white/10'
+                    />
+                  ) : (
+                    <div className='flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40'>
+                      Foto
+                    </div>
+                  )}
 
-              <Input
-                label='Nombre'
-                name='name'
-                value={formData.name}
-                onChange={handleChange}
-              />
+                  <input
+                    type='file'
+                    accept='image/*'
+                    onChange={handleProfileImageChange}
+                    className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
+                  />
+                </div>
+              </div>
 
-              <Input
-                label='Apellidos'
-                name='lastname'
-                value={formData.lastname}
-                onChange={handleChange}
-              />
-            </>
-          )}
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Ubicación
+                </p>
 
-          <Input
-            label='Teléfono principal'
-            name='Tfprin'
-            value={formData.Tfprin}
-            onChange={handleChange}
-          />
+                <div className='grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+                  <Input
+                    label='Dirección'
+                    name='direccion'
+                    value={formData.direccion}
+                    onChange={handleChange}
+                  />
 
-          <Input
-            label='Teléfono secundario'
-            name='Tf_sec'
-            value={formData.Tf_sec}
-            onChange={handleChange}
-          />
+                  <Input
+                    label='Población'
+                    name='poblacion'
+                    value={formData.poblacion}
+                    onChange={handleChange}
+                  />
 
-          <Input
-            label='Email'
-            name='email'
-            value={formData.email}
-            onChange={handleChange}
-          />
+                  <Input
+                    label='Código Postal'
+                    name='CP'
+                    value={formData.CP}
+                    onChange={handleChange}
+                  />
 
-          <Input
-            label='Dirección'
-            name='direccion'
-            value={formData.direccion}
-            onChange={handleChange}
-          />
+                  <Input
+                    label='País'
+                    name='Pais'
+                    value={formData.Pais}
+                    onChange={handleChange}
+                  />
 
-          <Input
-            label='Población'
-            name='poblacion'
-            value={formData.poblacion}
-            onChange={handleChange}
-          />
-
-          <Input
-            label='Código Postal'
-            name='CP'
-            value={formData.CP}
-            onChange={handleChange}
-          />
-
-          <Input
-            label='País'
-            name='Pais'
-            value={formData.Pais}
-            onChange={handleChange}
-          />
-
-          <Input
-            label='Provincia'
-            name='provincia'
-            value={formData.provincia}
-            onChange={handleChange}
-          />
+                  <Input
+                    label='Provincia'
+                    name='provincia'
+                    value={formData.provincia}
+                    onChange={handleChange}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
 
           <div className='flex gap-3'>
             <Button type='button' variant='secondary' onClick={closeModal}>
