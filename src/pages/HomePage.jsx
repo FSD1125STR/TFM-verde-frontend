@@ -160,7 +160,7 @@ export default function HomePage() {
   ];
 
   return (
-    <section className='max-w-7xl space-y-6 text-white'>
+    <section className='w-full space-y-6 text-white'>
       <PageHeader
         title='Panel de Control'
         description='Resumen operativo del taller y accesos principales.'

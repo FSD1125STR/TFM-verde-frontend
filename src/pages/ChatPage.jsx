@@ -187,7 +187,7 @@ export default function ChatPage() {
 
   return (
     <>
-      <section className='max-w-7xl space-y-6 text-white'>
+      <section className='w-full space-y-6 text-white'>
         <PageHeader
           title='Chat de Equipos'
           description='Crea grupos, consulta los canales activos y coordina al taller en tiempo real.'

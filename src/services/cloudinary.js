@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './authToken.js';
+
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -16,7 +18,14 @@ const getImages = async (folder) => {
       throw new Error(`Invalid folder: ${folder}`);
     }
 
-    const res = await fetch(`${API_BASE_URL}/cloudinary/images/${folder}`);
+    const res = await fetch(`${API_BASE_URL}/cloudinary/images/${folder}`, {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        ...getAuthHeaders(),
+      },
+      credentials: 'include',
+    });
 
     if (!res.ok) {
       throw new Error('Error fetching images');
@@ -38,14 +47,18 @@ const uploadImage = async (file, folder) => {
     throw new Error(`Invalid folder: ${folder}`);
   }
 
-  const fd = new FormData();
-  fd.append('file', file);
+    const fd = new FormData();
+    fd.append('file', file);
 
-  try {
-    const res = await fetch(`${API_BASE_URL}/cloudinary/upload/${folder}`, {
-      method: 'POST',
-      body: fd,
-    });
+    try {
+      const res = await fetch(`${API_BASE_URL}/cloudinary/upload/${folder}`, {
+        method: 'POST',
+        body: fd,
+        headers: {
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+      });
 
     if (!res.ok) {
       const errorData = await res.json();
@@ -72,7 +85,14 @@ const deleteImage = async (public_id, folder) => {
       .replace(/^\/+|\/+$/g, '');
     const res = await fetch(
       `${API_BASE_URL}/cloudinary/images/${FOLDERS[folder]}/${normalizedPublicId}`,
-      { method: 'DELETE' },
+      {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...getAuthHeaders(),
+        },
+        credentials: 'include',
+      },
     );
 
     if (!res.ok) {
@@ -89,13 +109,13 @@ const deleteImage = async (public_id, folder) => {
 // signed endpoints
 const getSignature = async (params = {}) => {
   // Call your server to get signature. Include any params you want signed (folder, public_id)
-  const res = await fetch(`${API_BASE_URL}/api/sign`, {
+  const res = await fetch(`${API_BASE_URL}/cloudinary/sign`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // send your auth token/cookie. For the demo server we use a demo header:
-      'x-taller-auth': 'letmeupload',
+      ...getAuthHeaders(),
     },
+    credentials: 'include',
     body: JSON.stringify(params),
   });
   if (!res.ok) {
