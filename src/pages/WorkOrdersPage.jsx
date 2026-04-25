@@ -395,6 +395,10 @@ function WorkOrderCard({
     backgroundSize: '0.95rem',
     colorScheme: 'dark',
   };
+  const compactOptionStyle = {
+    backgroundColor: '#1B2538',
+    color: '#F8FAFC',
+  };
 
   return (
     <Card className='p-5 transition hover:border-blue-500/30 hover:bg-white/[0.03]'>
@@ -450,7 +454,7 @@ function WorkOrderCard({
                   className='min-w-0 flex-1 appearance-none bg-transparent pr-8 text-sm font-medium text-white outline-none disabled:cursor-not-allowed disabled:opacity-60'
                 >
                   {mechanicOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
+                    <option key={option.value} value={option.value} style={compactOptionStyle}>
                       {option.label}
                     </option>
                   ))}
@@ -470,7 +474,7 @@ function WorkOrderCard({
                 className={`w-full min-w-[220px] appearance-none rounded-2xl border px-4 py-3 pr-10 text-sm font-medium outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${statusStyles[order.status]}`}
               >
                 {statusOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
+                  <option key={option.value} value={option.value} style={compactOptionStyle}>
                     {option.label}
                   </option>
                 ))}
