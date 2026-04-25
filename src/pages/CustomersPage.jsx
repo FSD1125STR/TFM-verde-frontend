@@ -1,6 +1,7 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Button from '../components/ui/Button';
+import Icon from '../components/ui/Icon';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Modal from '../components/ui/Modal';
@@ -49,6 +50,35 @@ const emptyFormData = {
   provincia: '',
 };
 
+function sanitizePostalCode(value) {
+  return String(value ?? '').replace(/\D/g, '').slice(0, 5);
+}
+
+function normalizeCustomerFormData(data) {
+  return {
+    type: data.type ?? 'PRIVATE',
+    dni: (data.dni ?? '').trim(),
+    name: (data.name ?? '').trim(),
+    lastname: (data.lastname ?? '').trim(),
+    cif: (data.cif ?? '').trim(),
+    company_name: (data.company_name ?? '').trim(),
+    Tfprin: (data.Tfprin ?? '').trim(),
+    Tf_sec: (data.Tf_sec ?? '').trim(),
+    email: (data.email ?? '').trim(),
+    direccion: (data.direccion ?? '').trim(),
+    poblacion: (data.poblacion ?? '').trim(),
+    CP: sanitizePostalCode(data.CP),
+    Pais: (data.Pais ?? '').trim(),
+    provincia: (data.provincia ?? '').trim(),
+    profile_image: data.profile_image
+      ? {
+          public_id: data.profile_image.public_id ?? '',
+          url: data.profile_image.url ?? '',
+        }
+      : null,
+  };
+}
+
 export default function CustomersPage() {
   const { profile } = useContext(LoginContext);
   const navigate = useNavigate();
@@ -60,6 +90,8 @@ export default function CustomersPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingCustomerId, setDeletingCustomerId] = useState(null);
   const [editingCustomer, setEditingCustomer] = useState(null);
+  const [modalCustomerSnapshot, setModalCustomerSnapshot] = useState(null);
+  const [modalMode, setModalMode] = useState('create');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('Todos');
@@ -100,18 +132,10 @@ export default function CustomersPage() {
     });
   }, [customers, search, typeFilter]);
 
-  const openCreateModal = () => {
-    setEditingCustomer(null);
-    setSubmitError('');
-    setFormData(emptyFormData);
-    setProfileImageFile(null);
-    setProfileImagePreview('');
-    setIsModalOpen(true);
-  };
+  const isReadOnlyMode = modalMode === 'view';
+  const isCreateMode = modalMode === 'create';
 
-  const openEditModal = (customer) => {
-    setEditingCustomer(customer);
-    setSubmitError('');
+  const applyCustomerToForm = (customer) => {
     setFormData({
       type: customer.type ?? 'PRIVATE',
       dni: customer.dni ?? '',
@@ -125,17 +149,64 @@ export default function CustomersPage() {
       profile_image: customer.profile_image ?? null,
       direccion: customer.direccion ?? '',
       poblacion: customer.poblacion ?? '',
-      CP: customer.CP ?? '',
+      CP: sanitizePostalCode(customer.CP),
       Pais: customer.Pais ?? '',
       provincia: customer.provincia ?? '',
     });
     setProfileImageFile(null);
     setProfileImagePreview(customer.profile_image?.url ?? '');
+  };
+
+  const openCreateModal = () => {
+    setModalMode('create');
+    setEditingCustomer(null);
+    setModalCustomerSnapshot(null);
+    setSubmitError('');
+    setFormData(emptyFormData);
+    setProfileImageFile(null);
+    setProfileImagePreview('');
     setIsModalOpen(true);
   };
 
+  const openEditModal = (customer) => {
+    setModalMode('edit');
+    setEditingCustomer(customer);
+    setModalCustomerSnapshot(customer);
+    setSubmitError('');
+    applyCustomerToForm(customer);
+    setIsModalOpen(true);
+  };
+
+  const openViewModal = (customer) => {
+    setModalMode('view');
+    setEditingCustomer(customer);
+    setModalCustomerSnapshot(customer);
+    setSubmitError('');
+    applyCustomerToForm(customer);
+    setIsModalOpen(true);
+  };
+
+  const toggleModalMode = () => {
+    if (!editingCustomer) return;
+
+    if (isReadOnlyMode) {
+      setModalMode('edit');
+      return;
+    }
+
+    if (modalCustomerSnapshot) {
+      applyCustomerToForm(modalCustomerSnapshot);
+      setEditingCustomer(modalCustomerSnapshot);
+    }
+
+    setSubmitError('');
+    setModalMode('view');
+  };
+
   const closeModal = () => {
+    setModalMode('create');
     setEditingCustomer(null);
+    setModalCustomerSnapshot(null);
     setSubmitError('');
     setFormData(emptyFormData);
     setProfileImageFile(null);
@@ -145,15 +216,16 @@ export default function CustomersPage() {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    const nextValue = name === 'CP' ? sanitizePostalCode(value) : value;
 
     setFormData((prev) => {
       const nextFormData = {
         ...prev,
-        [name]: value,
+        [name]: nextValue,
       };
 
       if (name === 'type') {
-        if (value === 'PRIVATE') {
+        if (nextValue === 'PRIVATE') {
           nextFormData.cif = '';
           nextFormData.company_name = '';
         } else {
@@ -166,6 +238,16 @@ export default function CustomersPage() {
       return nextFormData;
     });
   };
+
+  const hasEditChanges = useMemo(() => {
+    if (!editingCustomer || !modalCustomerSnapshot) return false;
+
+    return (
+      JSON.stringify(normalizeCustomerFormData(formData)) !==
+        JSON.stringify(normalizeCustomerFormData(modalCustomerSnapshot)) ||
+      Boolean(profileImageFile)
+    );
+  }, [editingCustomer, formData, modalCustomerSnapshot, profileImageFile]);
 
   const handleProfileImageChange = (e) => {
     const file = e.target.files?.[0] ?? null;
@@ -241,6 +323,7 @@ export default function CustomersPage() {
             customer._id === editingCustomer._id ? updatedCustomer : customer,
           ),
         );
+        setModalCustomerSnapshot(updatedCustomer);
       } else {
         const newCustomer = await createCustomer(payload);
         setCustomers((prev) => [...prev, newCustomer]);
@@ -418,8 +501,19 @@ export default function CustomersPage() {
                       </td>
 
                       <td className='px-6 py-4 text-right'>
-                        {profile.employee.rol === 'ADMIN' ? (
-                          <div className='flex flex-wrap justify-end gap-2'>
+                        <div className='flex flex-wrap justify-end gap-2'>
+                          <button
+                            type='button'
+                            onClick={() => openViewModal(customer)}
+                            className='flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:border-blue-500/40 hover:bg-white/5 hover:text-blue-300'
+                            aria-label='Ver cliente'
+                            title='Ver cliente'
+                          >
+                            <Icon name='eye' className='h-5 w-5' />
+                          </button>
+
+                          {profile.employee.rol === 'ADMIN' ? (
+                            <>
                             <Button
                               variant='secondary'
                               onClick={() =>
@@ -444,8 +538,9 @@ export default function CustomersPage() {
                                 ? 'Eliminando...'
                                 : 'Eliminar'}
                             </Button>
-                          </div>
-                        ) : null}
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -464,12 +559,34 @@ export default function CustomersPage() {
 
       <Modal
         isOpen={isModalOpen}
-        title={editingCustomer ? 'Editar Cliente' : 'Nuevo Cliente'}
+        title={
+          isReadOnlyMode
+            ? 'Ver Cliente'
+            : editingCustomer
+              ? 'Editar Cliente'
+              : 'Nuevo Cliente'
+        }
         onClose={closeModal}
+        headerActions={
+          editingCustomer && profile.employee.rol === 'ADMIN' ? (
+            <button
+              type='button'
+              onClick={toggleModalMode}
+              className='flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white'
+              aria-label={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+              title={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+            >
+              <Icon
+                name={isReadOnlyMode ? 'pencil' : 'eye'}
+                className='h-4 w-4'
+              />
+            </button>
+          ) : null
+        }
         panelClassName='md:min-w-[58vw] max-w-6xl'
         bodyClassName='max-h-[80vh] overflow-y-auto'
       >
-        <form onSubmit={handleSubmitCustomer} className='space-y-5'>
+        <form onSubmit={isReadOnlyMode ? undefined : handleSubmitCustomer} className='space-y-5'>
           {submitError ? (
             <p className='text-sm text-red-400'>{submitError}</p>
           ) : null}
@@ -501,6 +618,7 @@ export default function CustomersPage() {
                       { value: 'PRIVATE', label: 'Particular' },
                       { value: 'COMPANY', label: 'Compañía' },
                     ]}
+                    disabled={isReadOnlyMode}
                   />
                 )}
 
@@ -511,6 +629,7 @@ export default function CustomersPage() {
                       name='cif'
                       value={formData.cif}
                       onChange={handleChange}
+                      readOnly={isReadOnlyMode}
                     />
 
                     <Input
@@ -518,6 +637,7 @@ export default function CustomersPage() {
                       name='company_name'
                       value={formData.company_name}
                       onChange={handleChange}
+                      readOnly={isReadOnlyMode}
                     />
                   </div>
                 ) : (
@@ -527,6 +647,7 @@ export default function CustomersPage() {
                       name='dni'
                       value={formData.dni}
                       onChange={handleChange}
+                      readOnly={isReadOnlyMode}
                     />
 
                     <Input
@@ -534,6 +655,7 @@ export default function CustomersPage() {
                       name='name'
                       value={formData.name}
                       onChange={handleChange}
+                      readOnly={isReadOnlyMode}
                     />
 
                     <Input
@@ -541,6 +663,7 @@ export default function CustomersPage() {
                       name='lastname'
                       value={formData.lastname}
                       onChange={handleChange}
+                      readOnly={isReadOnlyMode}
                     />
                   </div>
                 )}
@@ -557,6 +680,7 @@ export default function CustomersPage() {
                     name='Tfprin'
                     value={formData.Tfprin}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -564,6 +688,7 @@ export default function CustomersPage() {
                     name='Tf_sec'
                     value={formData.Tf_sec}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -571,6 +696,7 @@ export default function CustomersPage() {
                     name='email'
                     value={formData.email}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
                 </div>
               </div>
@@ -595,12 +721,14 @@ export default function CustomersPage() {
                     </div>
                   )}
 
-                  <input
-                    type='file'
-                    accept='image/*'
-                    onChange={handleProfileImageChange}
-                    className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
-                  />
+                  {!isReadOnlyMode ? (
+                    <input
+                      type='file'
+                      accept='image/*'
+                      onChange={handleProfileImageChange}
+                      className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
+                    />
+                  ) : null}
                 </div>
               </div>
 
@@ -615,6 +743,7 @@ export default function CustomersPage() {
                     name='direccion'
                     value={formData.direccion}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -622,6 +751,7 @@ export default function CustomersPage() {
                     name='poblacion'
                     value={formData.poblacion}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -629,6 +759,10 @@ export default function CustomersPage() {
                     name='CP'
                     value={formData.CP}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
+                    inputMode='numeric'
+                    pattern='[0-9]{5}'
+                    maxLength={5}
                   />
 
                   <Input
@@ -636,6 +770,7 @@ export default function CustomersPage() {
                     name='Pais'
                     value={formData.Pais}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -643,6 +778,7 @@ export default function CustomersPage() {
                     name='provincia'
                     value={formData.provincia}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
                 </div>
               </div>
@@ -651,16 +787,21 @@ export default function CustomersPage() {
 
           <div className='flex gap-3'>
             <Button type='button' variant='secondary' onClick={closeModal}>
-              Cancelar
+              {isReadOnlyMode ? 'Cerrar' : 'Cancelar'}
             </Button>
 
-            <Button type='submit'>
-              {isSubmitting
-                ? 'Guardando...'
-                : editingCustomer
-                  ? 'Actualizar'
-                  : 'Guardar'}
-            </Button>
+            {!isReadOnlyMode ? (
+              <Button
+                type='submit'
+                disabled={!isCreateMode && !hasEditChanges}
+              >
+                {isSubmitting
+                  ? 'Guardando...'
+                  : isCreateMode
+                    ? 'Guardar'
+                    : 'Actualizar'}
+              </Button>
+            ) : null}
           </div>
         </form>
       </Modal>

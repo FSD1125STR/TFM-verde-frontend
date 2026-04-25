@@ -4,9 +4,10 @@ export default function Button({
     onClick,
     className = "",
     variant = "primary",
+    disabled = false,
     }) {
     const baseStyles =
-        "px-5 py-3 rounded-xl font-medium transition";
+        "px-5 py-3 rounded-xl font-medium transition disabled:cursor-not-allowed disabled:opacity-50";
 
     const variants = {
         primary: "bg-blue-600 text-white hover:bg-blue-700",
@@ -18,6 +19,7 @@ export default function Button({
         <button
         type={type}
         onClick={onClick}
+        disabled={disabled}
         className={`${baseStyles} ${variants[variant]} ${className}`}
         >
         {children}
