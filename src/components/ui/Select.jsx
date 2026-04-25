@@ -14,6 +14,10 @@ export default function Select({
         backgroundSize: "1rem",
         colorScheme: "dark",
     };
+    const optionStyle = {
+        backgroundColor: "#111827",
+        color: "#F8FAFC",
+    };
 
     return (
         <div>
@@ -32,7 +36,7 @@ export default function Select({
             className={`w-full appearance-none rounded-2xl border border-white/5 bg-[#1F2937] px-4 py-3 pr-12 text-white outline-none transition focus:border-blue-500/50 disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
         >
             {options.map((option) => (
-            <option key={option.value} value={option.value}>
+            <option key={option.value} value={option.value} style={optionStyle}>
                 {option.label}
             </option>
             ))}
