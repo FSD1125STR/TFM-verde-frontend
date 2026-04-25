@@ -1,13 +1,21 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button.jsx';
 import Card from '../components/ui/Card.jsx';
 import Icon from '../components/ui/Icon.jsx';
 import Input from '../components/ui/Input.jsx';
+import Modal from '../components/ui/Modal.jsx';
 import PageHeader from '../components/ui/PageHeader.jsx';
 import Select from '../components/ui/Select.jsx';
+import { LoginContext } from '../contexts/AuthContext.js';
+import { deleteImage, uploadImage } from '../services/cloudinary.js';
+import { getCustomers } from '../services/customerApi.js';
 import { getEmployees } from '../services/employeeApi.js';
-import { getVehicles, sendWorkOrderEmail, updateVehicle } from '../services/vehicleApi.js';
+import {
+  getVehicleById,
+  getVehicles,
+  sendWorkOrderEmail,
+  updateVehicle,
+} from '../services/vehicleApi.js';
 
 const statusStyles = {
   'En proceso': 'border-blue-500/30 bg-blue-500/15 text-blue-300',
@@ -60,10 +68,77 @@ function formatPlate(plate) {
   return String(plate || '---').toUpperCase();
 }
 
+function getFuelLabel(level) {
+  return ['Vacio', '1/4', '1/2', '3/4', 'Lleno'][level] ?? '-';
+}
+
+function normalizeAsset(asset) {
+  if (!asset || typeof asset !== 'object') return null;
+
+  if (asset.public_id && asset.url) {
+    return {
+      public_id: asset.public_id,
+      url: asset.url,
+    };
+  }
+
+  if (asset.type?.public_id && asset.type?.url) {
+    return {
+      public_id: asset.type.public_id,
+      url: asset.type.url,
+    };
+  }
+
+  return null;
+}
+
+function normalizeAssetList(assets) {
+  if (!Array.isArray(assets)) return [];
+
+  return assets.map(normalizeAsset).filter(Boolean);
+}
+
+function normalizeVehicleMedia(vehicle) {
+  if (!vehicle || typeof vehicle !== 'object') return vehicle;
+
+  return {
+    ...vehicle,
+    reception_images: normalizeAssetList(vehicle.reception_images),
+    customer_signature: normalizeAsset(vehicle.customer_signature),
+  };
+}
+
+function normalizeVehicleFormData(data) {
+  return {
+    client_id: data.client_id ?? '',
+    matricula: (data.matricula ?? '').trim(),
+    n_bastidor: (data.n_bastidor ?? '').trim(),
+    marca: (data.marca ?? '').trim(),
+    modelo: (data.modelo ?? '').trim(),
+    tipo_combustible: (data.tipo_combustible ?? '').trim(),
+    cantidad_combustible: String(data.cantidad_combustible ?? '0'),
+    year: String(data.year ?? '').trim(),
+    observaciones: (data.observaciones ?? '').trim(),
+  };
+}
+
+const emptyVehicleFormData = {
+  client_id: '',
+  matricula: '',
+  n_bastidor: '',
+  marca: '',
+  modelo: '',
+  tipo_combustible: '',
+  cantidad_combustible: '0',
+  year: '',
+  observaciones: '',
+};
+
 function buildOrders(vehicles, employees) {
   return vehicles.map((vehicle, index) => {
     return {
       id: vehicle._id,
+      vehicleId: vehicle._id,
       orderNumber: buildOrderNumber(index),
       date: getOrderDate(vehicle),
       plate: vehicle.matricula,
@@ -306,11 +381,20 @@ function WorkOrderCard({
   onChangeStatus,
   onDownloadPdf,
   onSendEmail,
+  onPreview,
+  onOpenVehicle,
   isSendingEmail,
   isUpdatingMechanic,
   isUpdatingStatus,
 }) {
   const formattedPlate = formatPlate(order.plate);
+  const compactSelectStyle = {
+    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23cbd5e1' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m5 7 5 6 5-6'/%3E%3C/svg%3E")`,
+    backgroundPosition: 'right 0.15rem center',
+    backgroundRepeat: 'no-repeat',
+    backgroundSize: '0.95rem',
+    colorScheme: 'dark',
+  };
 
   return (
     <Card className='p-5 transition hover:border-blue-500/30 hover:bg-white/[0.03]'>
@@ -362,7 +446,8 @@ function WorkOrderCard({
                   value={order.assignedMechanicId}
                   onChange={(event) => onAssignMechanic(order, event.target.value)}
                   disabled={isUpdatingMechanic}
-                  className='min-w-0 flex-1 appearance-none bg-transparent pr-7 text-sm font-medium text-white outline-none disabled:cursor-not-allowed disabled:opacity-60'
+                  style={compactSelectStyle}
+                  className='min-w-0 flex-1 appearance-none bg-transparent pr-8 text-sm font-medium text-white outline-none disabled:cursor-not-allowed disabled:opacity-60'
                 >
                   {mechanicOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -381,7 +466,8 @@ function WorkOrderCard({
                 value={order.status}
                 onChange={(event) => onChangeStatus(order, event.target.value)}
                 disabled={isUpdatingStatus}
-                className={`w-full min-w-[220px] appearance-none rounded-2xl border px-4 py-3 text-sm font-medium outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${statusStyles[order.status]}`}
+                style={compactSelectStyle}
+                className={`w-full min-w-[220px] appearance-none rounded-2xl border px-4 py-3 pr-10 text-sm font-medium outline-none transition disabled:cursor-not-allowed disabled:opacity-60 ${statusStyles[order.status]}`}
               >
                 {statusOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -394,6 +480,15 @@ function WorkOrderCard({
         </div>
 
         <div className='flex items-center justify-end gap-2 self-end text-white/45 xl:self-center'>
+          <button
+            type='button'
+            onClick={() => onPreview(order)}
+            className='flex h-10 w-10 items-center justify-center rounded-xl transition hover:bg-white/10 hover:text-white'
+            aria-label='Previsualizar orden'
+            title='Previsualizar orden'
+          >
+            <Icon name='eye' className='h-5 w-5' />
+          </button>
           <button
             type='button'
             onClick={() => onDownloadPdf(order)}
@@ -421,14 +516,15 @@ function WorkOrderCard({
           >
             <Icon name='mail' className={isSendingEmail ? 'h-5 w-5 animate-pulse' : 'h-5 w-5'} />
           </button>
-          <Link
-            to='/vehicles'
+          <button
+            type='button'
+            onClick={() => onOpenVehicle(order.vehicleId)}
             className='flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10 text-lg transition hover:bg-blue-600 hover:text-white'
             aria-label='Abrir vehiculo'
             title='Abrir vehiculo'
           >
-            <Icon name='arrowRight' className='h-5 w-5' />
-          </Link>
+            <Icon name='vehicles' className='h-5 w-5' />
+          </button>
         </div>
       </div>
     </Card>
@@ -436,8 +532,11 @@ function WorkOrderCard({
 }
 
 export default function WorkOrdersPage() {
+  const { profile } = useContext(LoginContext);
+  const signatureCanvasRef = useRef(null);
   const [vehicles, setVehicles] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -445,6 +544,20 @@ export default function WorkOrdersPage() {
   const [sendingOrderId, setSendingOrderId] = useState('');
   const [updatingOrderId, setUpdatingOrderId] = useState('');
   const [updatingStatusOrderId, setUpdatingStatusOrderId] = useState('');
+  const [previewOrder, setPreviewOrder] = useState(null);
+  const [selectedWorkOrderVehicle, setSelectedWorkOrderVehicle] = useState(null);
+  const [vehicleModalSnapshot, setVehicleModalSnapshot] = useState(null);
+  const [vehicleModalMode, setVehicleModalMode] = useState('view');
+  const [isVehicleModalOpen, setIsVehicleModalOpen] = useState(false);
+  const [isLoadingVehicleDetail, setIsLoadingVehicleDetail] = useState(false);
+  const [vehicleSubmitError, setVehicleSubmitError] = useState('');
+  const [isVehicleSubmitting, setIsVehicleSubmitting] = useState(false);
+  const [vehicleFormData, setVehicleFormData] = useState(emptyVehicleFormData);
+  const [receptionImages, setReceptionImages] = useState([]);
+  const [signatureImage, setSignatureImage] = useState(null);
+  const [newReceptionFiles, setNewReceptionFiles] = useState([]);
+  const [isDrawingSignature, setIsDrawingSignature] = useState(false);
+  const [hasNewSignature, setHasNewSignature] = useState(false);
 
   useEffect(() => {
     const fetchPageData = async () => {
@@ -452,13 +565,15 @@ export default function WorkOrdersPage() {
       setError('');
 
       try {
-        const [vehiclesData, employeesData] = await Promise.all([
+        const [vehiclesData, employeesData, customersData] = await Promise.all([
           getVehicles(),
           getEmployees(),
+          getCustomers(),
         ]);
 
-        setVehicles(vehiclesData);
+        setVehicles(vehiclesData.map(normalizeVehicleMedia));
         setEmployees(employeesData);
+        setCustomers(customersData);
       } catch (fetchError) {
         setError(fetchError.message);
       } finally {
@@ -469,7 +584,19 @@ export default function WorkOrdersPage() {
     fetchPageData();
   }, []);
 
+  useEffect(() => {
+    if (!isVehicleModalOpen) return;
+
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }, [isVehicleModalOpen]);
+
   const orders = useMemo(() => buildOrders(vehicles, employees), [vehicles, employees]);
+  const isVehicleReadOnlyMode = vehicleModalMode === 'view';
   const mechanics = useMemo(
     () => employees.filter((employee) => String(employee.rol || '').toLowerCase().includes('mec')),
     [employees],
@@ -489,6 +616,10 @@ export default function WorkOrdersPage() {
     { value: 'En proceso', label: 'En proceso' },
     { value: 'Completada', label: 'Completada' },
   ];
+  const formCustomerOptions = customers.map((customer) => ({
+    value: customer._id,
+    label: `${customer.displayName} - ${customer.identifier}`,
+  }));
 
   const filteredOrders = useMemo(() => {
     const normalizedSearch = search.trim().toLowerCase();
@@ -616,71 +747,716 @@ export default function WorkOrdersPage() {
     }
   };
 
+  const openPreviewModal = (order) => {
+    setPreviewOrder(order);
+  };
+
+  const closePreviewModal = () => {
+    setPreviewOrder(null);
+  };
+
+  const hydrateVehicleModal = (vehicle) => {
+    const normalizedVehicle = normalizeVehicleMedia(vehicle);
+
+    setSelectedWorkOrderVehicle(normalizedVehicle);
+    setVehicleFormData({
+      client_id: normalizedVehicle.client_id?._id ?? '',
+      matricula: normalizedVehicle.matricula ?? '',
+      n_bastidor: normalizedVehicle.n_bastidor ?? '',
+      marca: normalizedVehicle.marca ?? '',
+      modelo: normalizedVehicle.modelo ?? '',
+      tipo_combustible: normalizedVehicle.tipo_combustible ?? '',
+      cantidad_combustible: String(normalizedVehicle.cantidad_combustible ?? 0),
+      year: normalizedVehicle.year
+        ? new Date(normalizedVehicle.year).getFullYear().toString()
+        : '',
+      observaciones: normalizedVehicle.observaciones ?? '',
+    });
+    setReceptionImages(normalizedVehicle.reception_images ?? []);
+    setSignatureImage(normalizedVehicle.customer_signature ?? null);
+    setNewReceptionFiles([]);
+    setVehicleSubmitError('');
+    setHasNewSignature(false);
+    clearVehicleSignatureCanvas();
+  };
+
+  const openVehicleModal = async (vehicleId, mode = 'view') => {
+    setVehicleModalMode(mode);
+    setIsVehicleModalOpen(true);
+    setVehicleSubmitError('');
+    setIsLoadingVehicleDetail(true);
+
+    const baseVehicle = vehicles.find((vehicle) => vehicle._id === vehicleId);
+    if (baseVehicle) {
+      const normalizedBaseVehicle = normalizeVehicleMedia(baseVehicle);
+      setVehicleModalSnapshot(normalizedBaseVehicle);
+      hydrateVehicleModal(normalizedBaseVehicle);
+    }
+
+    try {
+      const vehicleDetail = await getVehicleById(vehicleId);
+      const normalizedVehicleDetail = normalizeVehicleMedia(vehicleDetail);
+      setVehicleModalSnapshot(normalizedVehicleDetail);
+      hydrateVehicleModal(normalizedVehicleDetail);
+    } catch (vehicleError) {
+      setVehicleSubmitError(vehicleError.message);
+    } finally {
+      setIsLoadingVehicleDetail(false);
+    }
+  };
+
+  const closeVehicleModal = () => {
+    setSelectedWorkOrderVehicle(null);
+    setVehicleModalSnapshot(null);
+    setVehicleModalMode('view');
+    setVehicleSubmitError('');
+    setVehicleFormData(emptyVehicleFormData);
+    setReceptionImages([]);
+    setSignatureImage(null);
+    setNewReceptionFiles([]);
+    setHasNewSignature(false);
+    clearVehicleSignatureCanvas();
+    setIsVehicleModalOpen(false);
+  };
+
+  const toggleVehicleModalMode = () => {
+    if (!selectedWorkOrderVehicle) return;
+
+    if (isVehicleReadOnlyMode) {
+      setVehicleModalMode('edit');
+      return;
+    }
+
+    if (vehicleModalSnapshot) {
+      hydrateVehicleModal(vehicleModalSnapshot);
+    }
+
+    setVehicleSubmitError('');
+    setVehicleModalMode('view');
+  };
+
+  const handleVehicleFormChange = (event) => {
+    const { name, value } = event.target;
+
+    setVehicleFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleReceptionFilesChange = (event) => {
+    setNewReceptionFiles(Array.from(event.target.files ?? []));
+  };
+
+  const handleRemoveReceptionImage = async (image) => {
+    if (!window.confirm('Eliminar esta foto de recepcion?')) return;
+
+    try {
+      await deleteImage(image.public_id, 'VEHICLE_RECEPTION');
+      setReceptionImages((prev) =>
+        prev.filter((item) => item.public_id !== image.public_id),
+      );
+    } catch (vehicleError) {
+      setVehicleSubmitError(vehicleError.message);
+    }
+  };
+
+  const getSignatureCoordinates = (event) => {
+    const canvas = signatureCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const pointer = event.touches ? event.touches[0] : event;
+
+    return {
+      x: (pointer.clientX - rect.left) * scaleX,
+      y: (pointer.clientY - rect.top) * scaleY,
+    };
+  };
+
+  const startVehicleSignatureDrawing = (event) => {
+    event.preventDefault();
+
+    const canvas = signatureCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { x, y } = getSignatureCoordinates(event);
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = '#0f172a';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    setIsDrawingSignature(true);
+  };
+
+  const drawVehicleSignature = (event) => {
+    if (!isDrawingSignature) return;
+    event.preventDefault();
+
+    const canvas = signatureCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    const { x, y } = getSignatureCoordinates(event);
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+    setHasNewSignature(true);
+  };
+
+  const stopVehicleSignatureDrawing = () => {
+    setIsDrawingSignature(false);
+  };
+
+  const clearVehicleSignatureCanvas = () => {
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    setHasNewSignature(false);
+  };
+
+  const vehicleCanvasToBlob = () =>
+    new Promise((resolve, reject) => {
+      const canvas = signatureCanvasRef.current;
+
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('No se pudo generar la firma.'));
+          return;
+        }
+
+        resolve(blob);
+      }, 'image/png');
+    });
+
+  const hasVehicleEditChanges = useMemo(() => {
+    if (!selectedWorkOrderVehicle || !vehicleModalSnapshot) return false;
+
+    const snapshotFormData = {
+      client_id: vehicleModalSnapshot.client_id?._id ?? '',
+      matricula: vehicleModalSnapshot.matricula ?? '',
+      n_bastidor: vehicleModalSnapshot.n_bastidor ?? '',
+      marca: vehicleModalSnapshot.marca ?? '',
+      modelo: vehicleModalSnapshot.modelo ?? '',
+      tipo_combustible: vehicleModalSnapshot.tipo_combustible ?? '',
+      cantidad_combustible: String(vehicleModalSnapshot.cantidad_combustible ?? 0),
+      year: vehicleModalSnapshot.year
+        ? new Date(vehicleModalSnapshot.year).getFullYear().toString()
+        : '',
+      observaciones: vehicleModalSnapshot.observaciones ?? '',
+    };
+
+    return (
+      JSON.stringify(normalizeVehicleFormData(vehicleFormData)) !==
+        JSON.stringify(normalizeVehicleFormData(snapshotFormData)) ||
+      newReceptionFiles.length > 0 ||
+      hasNewSignature ||
+      JSON.stringify(receptionImages) !==
+        JSON.stringify(vehicleModalSnapshot.reception_images ?? []) ||
+      JSON.stringify(signatureImage) !==
+        JSON.stringify(vehicleModalSnapshot.customer_signature ?? null)
+    );
+  }, [
+    hasNewSignature,
+    newReceptionFiles.length,
+    receptionImages,
+    selectedWorkOrderVehicle,
+    signatureImage,
+    vehicleFormData,
+    vehicleModalSnapshot,
+  ]);
+
+  const handleSubmitVehicle = async (event) => {
+    event.preventDefault();
+    setVehicleSubmitError('');
+
+    if (
+      !selectedWorkOrderVehicle ||
+      !vehicleFormData.client_id ||
+      !vehicleFormData.matricula.trim() ||
+      !vehicleFormData.n_bastidor.trim() ||
+      !vehicleFormData.marca.trim() ||
+      !vehicleFormData.modelo.trim() ||
+      !vehicleFormData.tipo_combustible.trim() ||
+      !vehicleFormData.year.trim()
+    ) {
+      setVehicleSubmitError('Completa todos los campos obligatorios.');
+      return;
+    }
+
+    setIsVehicleSubmitting(true);
+
+    try {
+      const uploadedReceptionImages = await Promise.all(
+        newReceptionFiles.map((file) => uploadImage(file, 'VEHICLE_RECEPTION')),
+      );
+
+      let nextSignature = signatureImage;
+      if (hasNewSignature) {
+        const signatureBlob = await vehicleCanvasToBlob();
+        const signatureFile = new File([signatureBlob], 'signature.png', {
+          type: 'image/png',
+        });
+        const uploadedSignature = await uploadImage(signatureFile, 'VEHICLE_SIGNATURES');
+
+        if (signatureImage?.public_id) {
+          await deleteImage(signatureImage.public_id, 'VEHICLE_SIGNATURES');
+        }
+
+        nextSignature = {
+          public_id: uploadedSignature.public_id,
+          url: uploadedSignature.url,
+        };
+      }
+
+      const updatedVehicle = normalizeVehicleMedia(
+        await updateVehicle(selectedWorkOrderVehicle._id, {
+          client_id: vehicleFormData.client_id,
+          matricula: vehicleFormData.matricula.trim().toUpperCase(),
+          n_bastidor: vehicleFormData.n_bastidor.trim(),
+          marca: vehicleFormData.marca.trim(),
+          modelo: vehicleFormData.modelo.trim(),
+          tipo_combustible: vehicleFormData.tipo_combustible.trim(),
+          cantidad_combustible: Number(vehicleFormData.cantidad_combustible),
+          year: new Date(`${vehicleFormData.year}-01-01`).toISOString(),
+          observaciones: vehicleFormData.observaciones.trim(),
+          reception_images: [
+            ...receptionImages,
+            ...uploadedReceptionImages.map((image) => ({
+              public_id: image.public_id,
+              url: image.url,
+            })),
+          ],
+          customer_signature: nextSignature,
+        }),
+      );
+
+      setVehicles((prev) =>
+        prev.map((vehicle) =>
+          vehicle._id === updatedVehicle._id ? updatedVehicle : vehicle,
+        ),
+      );
+      setVehicleModalSnapshot(updatedVehicle);
+      hydrateVehicleModal(updatedVehicle);
+      setVehicleModalMode('view');
+    } catch (vehicleError) {
+      setVehicleSubmitError(vehicleError.message);
+    } finally {
+      setIsVehicleSubmitting(false);
+    }
+  };
+
   return (
-    <section className='w-full space-y-6 text-white'>
-      <PageHeader
-        title='Ordenes de Trabajo'
-        description='Consulta el estado de los trabajos abiertos y recientes del taller.'
-      />
+    <>
+      <section className='w-full space-y-6 text-white'>
+        <PageHeader
+          title='Ordenes de Trabajo'
+          description='Consulta el estado de los trabajos abiertos y recientes del taller.'
+        />
 
-      <Card className='p-4'>
-        {error ? <p className='mb-4 text-sm text-red-400'>{error}</p> : null}
+        <Card className='p-4'>
+          {error ? <p className='mb-4 text-sm text-red-400'>{error}</p> : null}
 
-        <div className='grid gap-3 lg:grid-cols-[1fr_180px_150px] lg:items-end'>
-          <Input
-            label='Buscar'
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder='Buscar por orden, matricula, cliente o mecanico...'
-            className='border-white/10 bg-[#111827]'
-          />
+          <div className='grid gap-3 lg:grid-cols-[1fr_180px_150px] lg:items-end'>
+            <Input
+              label='Buscar'
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder='Buscar por orden, matricula, cliente o mecanico...'
+              className='border-white/10 bg-[#111827]'
+            />
 
-          <Select
-            label='Estado'
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            options={[
-              { value: 'Todos', label: 'Todos' },
-              { value: 'En proceso', label: 'En proceso' },
-              { value: 'Pendiente', label: 'Pendiente' },
-              { value: 'Completada', label: 'Completada' },
-            ]}
-            className='border-white/10 bg-[#111827]'
-          />
+            <Select
+              label='Estado'
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              options={[
+                { value: 'Todos', label: 'Todos' },
+                { value: 'En proceso', label: 'En proceso' },
+                { value: 'Pendiente', label: 'Pendiente' },
+                { value: 'Completada', label: 'Completada' },
+              ]}
+              className='border-white/10 bg-[#111827]'
+            />
 
-          <Button onClick={handleExport} className='h-[50px] uppercase tracking-widest'>
-            Exportar
-          </Button>
-        </div>
-      </Card>
+            <Button onClick={handleExport} className='h-[50px] uppercase tracking-widest'>
+              Exportar
+            </Button>
+          </div>
+        </Card>
 
-      <div className='space-y-4'>
-        {isLoading ? (
-          <Card className='p-10 text-center text-white/50'>
-            Cargando ordenes de trabajo...
-          </Card>
-        ) : filteredOrders.length > 0 ? (
-          filteredOrders.map((order) => (
-            <WorkOrderCard
-              key={order.id}
-              order={order}
-              mechanicOptions={mechanicOptions}
-              statusOptions={statusOptions}
-              onAssignMechanic={handleAssignMechanic}
+        <div className='space-y-4'>
+          {isLoading ? (
+            <Card className='p-10 text-center text-white/50'>
+              Cargando ordenes de trabajo...
+            </Card>
+          ) : filteredOrders.length > 0 ? (
+            filteredOrders.map((order) => (
+              <WorkOrderCard
+                key={order.id}
+                order={order}
+                mechanicOptions={mechanicOptions}
+                statusOptions={statusOptions}
+                onAssignMechanic={handleAssignMechanic}
               onChangeStatus={handleChangeStatus}
               onDownloadPdf={handleExportOrderPdf}
               onSendEmail={handleSendOrderEmail}
+              onPreview={openPreviewModal}
+              onOpenVehicle={openVehicleModal}
               isSendingEmail={sendingOrderId === order.id}
               isUpdatingMechanic={updatingOrderId === order.id}
               isUpdatingStatus={updatingStatusOrderId === order.id}
-            />
-          ))
-        ) : (
-          <Card className='p-10 text-center text-white/50'>
-            No hay ordenes de trabajo para los filtros seleccionados.
-          </Card>
-        )}
-      </div>
-    </section>
+              />
+            ))
+          ) : (
+            <Card className='p-10 text-center text-white/50'>
+              No hay ordenes de trabajo para los filtros seleccionados.
+            </Card>
+          )}
+        </div>
+      </section>
+
+      <Modal
+        isOpen={Boolean(previewOrder)}
+        title='Previsualización de la Orden'
+        onClose={closePreviewModal}
+        panelClassName='md:min-w-[52vw] max-w-4xl'
+      >
+        {previewOrder ? (
+          <div className='space-y-6 text-white'>
+            <div className='grid gap-4 md:grid-cols-2'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Orden
+                </p>
+                <p className='mt-3 text-xl font-semibold text-white'>
+                  {previewOrder.orderNumber}
+                </p>
+                <p className='text-sm text-white/50'>
+                  {formatDate(previewOrder.date)}
+                </p>
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Estado
+                </p>
+                <span
+                  className={`mt-3 inline-flex rounded-full border px-3 py-1 text-xs font-medium ${statusStyles[previewOrder.status]}`}
+                >
+                  {previewOrder.status}
+                </span>
+              </div>
+            </div>
+
+            <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                Vehículo
+              </p>
+              <p className='text-lg font-semibold text-white'>
+                {previewOrder.vehicleName || 'Vehículo sin modelo'}
+              </p>
+              <p className='text-sm text-white/60'>{formatPlate(previewOrder.plate)}</p>
+            </div>
+
+            <div className='grid gap-4 md:grid-cols-2'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Cliente
+                </p>
+                <p className='mt-3 text-white'>{previewOrder.customerName}</p>
+                <p className='text-sm text-white/50'>
+                  {previewOrder.customerEmail || 'Sin email registrado'}
+                </p>
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Mecánico
+                </p>
+                <p className='mt-3 text-white'>{previewOrder.mechanicName}</p>
+              </div>
+            </div>
+
+            <div className='rounded-3xl border border-white/10 bg-white/5 p-4'>
+              <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                Observaciones
+              </p>
+              <p className='mt-3 text-white/80'>{previewOrder.observations}</p>
+            </div>
+
+            <div className='flex justify-end gap-3'>
+              <Button type='button' variant='secondary' onClick={closePreviewModal}>
+                Cerrar
+              </Button>
+
+              <Button
+                type='button'
+                onClick={() => {
+                  closePreviewModal();
+                  openVehicleModal(previewOrder.vehicleId);
+                }}
+              >
+                Ver vehículo
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        isOpen={isVehicleModalOpen}
+        title={isVehicleReadOnlyMode ? 'Ver Vehiculo' : 'Editar Vehiculo'}
+        onClose={closeVehicleModal}
+        headerActions={
+          selectedWorkOrderVehicle && profile.employee.rol === 'ADMIN' ? (
+            <button
+              type='button'
+              onClick={toggleVehicleModalMode}
+              className='flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white'
+              aria-label={isVehicleReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+              title={isVehicleReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+            >
+              <Icon name={isVehicleReadOnlyMode ? 'pencil' : 'eye'} className='h-4 w-4' />
+            </button>
+          ) : null
+        }
+        panelClassName='md:min-w-[50vw] max-w-6xl'
+        bodyClassName='max-h-[80vh] overflow-y-auto'
+      >
+        <form onSubmit={isVehicleReadOnlyMode ? undefined : handleSubmitVehicle} className='space-y-6'>
+          {isLoadingVehicleDetail ? (
+            <p className='text-sm text-white/50'>Cargando datos completos del vehículo...</p>
+          ) : null}
+
+          {vehicleSubmitError ? (
+            <p className='text-sm text-red-400'>{vehicleSubmitError}</p>
+          ) : null}
+
+          <div className='grid gap-6 xl:grid-cols-[1.2fr_0.8fr]'>
+            <div className='space-y-6'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Datos Principales
+                </p>
+
+                <div className='grid gap-4 md:grid-cols-2'>
+                  <Select
+                    label='Cliente'
+                    name='client_id'
+                    value={vehicleFormData.client_id}
+                    onChange={isVehicleReadOnlyMode ? undefined : handleVehicleFormChange}
+                    options={formCustomerOptions}
+                    disabled={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Matricula'
+                    name='matricula'
+                    value={vehicleFormData.matricula}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Marca'
+                    name='marca'
+                    value={vehicleFormData.marca}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Modelo'
+                    name='modelo'
+                    value={vehicleFormData.modelo}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Tipo de combustible'
+                    name='tipo_combustible'
+                    value={vehicleFormData.tipo_combustible}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+
+                  <Select
+                    label='Nivel combustible'
+                    name='cantidad_combustible'
+                    value={vehicleFormData.cantidad_combustible}
+                    onChange={isVehicleReadOnlyMode ? undefined : handleVehicleFormChange}
+                    options={[
+                      { value: '0', label: 'Vacio' },
+                      { value: '1', label: '1/4' },
+                      { value: '2', label: '1/2' },
+                      { value: '3', label: '3/4' },
+                      { value: '4', label: 'Lleno' },
+                    ]}
+                    disabled={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Numero de bastidor'
+                    name='n_bastidor'
+                    value={vehicleFormData.n_bastidor}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+
+                  <Input
+                    label='Año'
+                    name='year'
+                    value={vehicleFormData.year}
+                    onChange={handleVehicleFormChange}
+                    readOnly={isVehicleReadOnlyMode}
+                  />
+                </div>
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-4'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Observaciones
+                </p>
+                <textarea
+                  name='observaciones'
+                  value={vehicleFormData.observaciones}
+                  onChange={isVehicleReadOnlyMode ? undefined : handleVehicleFormChange}
+                  readOnly={isVehicleReadOnlyMode}
+                  className='w-full h-32 rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5 text-white resize-none read-only:text-white/70'
+                />
+              </div>
+            </div>
+
+            <div className='space-y-6'>
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-3'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Fotos de recepcion
+                </p>
+
+                {receptionImages.length === 0 ? (
+                  <p className='text-sm text-white/50'>No hay fotos guardadas.</p>
+                ) : (
+                  <div className='grid grid-cols-2 gap-3'>
+                    {receptionImages.map((image) => (
+                      <div key={image.public_id} className='relative'>
+                        <img
+                          src={image.url}
+                          alt='Recepcion'
+                          className='h-28 w-full rounded-xl object-cover border border-white/10'
+                        />
+                        {!isVehicleReadOnlyMode ? (
+                          <button
+                            type='button'
+                            onClick={() => handleRemoveReceptionImage(image)}
+                            className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
+                          >
+                            x
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {!isVehicleReadOnlyMode ? (
+                  <input
+                    type='file'
+                    multiple
+                    accept='image/*'
+                    onChange={handleReceptionFilesChange}
+                    className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
+                  />
+                ) : null}
+
+                {!isVehicleReadOnlyMode && newReceptionFiles.length > 0 ? (
+                  <p className='text-xs text-white/50'>
+                    {newReceptionFiles.length} archivo(s) listo(s) para subir.
+                  </p>
+                ) : null}
+              </div>
+
+              <div className='rounded-3xl border border-white/10 bg-white/5 p-4 space-y-3'>
+                <p className='text-[11px] font-bold uppercase tracking-widest text-white/40'>
+                  Firma
+                </p>
+
+                {signatureImage ? (
+                  <div className='space-y-3'>
+                    <img
+                      src={signatureImage.url}
+                      alt='Firma'
+                      className='h-28 w-full rounded-xl object-contain border border-white/10 p-2'
+                    />
+                    {!isVehicleReadOnlyMode ? (
+                      <p className='text-xs text-white/50'>
+                        Dibuja una nueva firma en el canvas para reemplazar la actual al guardar.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className='text-sm text-white/50'>
+                    {isVehicleReadOnlyMode
+                      ? 'No hay firma guardada.'
+                      : 'No hay firma guardada. Puedes dibujarla abajo.'}
+                  </p>
+                )}
+
+                {!isVehicleReadOnlyMode ? (
+                  <div className='flex justify-end'>
+                    <button
+                      type='button'
+                      onClick={clearVehicleSignatureCanvas}
+                      className='px-3 py-2 rounded-xl bg-[#1F2937] text-xs text-white/70 hover:text-white'
+                    >
+                      Limpiar firma
+                    </button>
+                  </div>
+                ) : null}
+
+                <div className='rounded-2xl border border-white/10 bg-[#172033] p-3'>
+                  <canvas
+                    ref={signatureCanvasRef}
+                    width={700}
+                    height={180}
+                    className={`w-full h-[180px] rounded-xl ${isVehicleReadOnlyMode ? '' : 'cursor-crosshair'}`}
+                    onMouseDown={isVehicleReadOnlyMode ? undefined : startVehicleSignatureDrawing}
+                    onMouseMove={isVehicleReadOnlyMode ? undefined : drawVehicleSignature}
+                    onMouseUp={isVehicleReadOnlyMode ? undefined : stopVehicleSignatureDrawing}
+                    onMouseLeave={isVehicleReadOnlyMode ? undefined : stopVehicleSignatureDrawing}
+                    onTouchStart={isVehicleReadOnlyMode ? undefined : startVehicleSignatureDrawing}
+                    onTouchMove={isVehicleReadOnlyMode ? undefined : drawVehicleSignature}
+                    onTouchEnd={isVehicleReadOnlyMode ? undefined : stopVehicleSignatureDrawing}
+                  />
+                </div>
+
+                {!isVehicleReadOnlyMode && hasNewSignature ? (
+                  <p className='text-xs text-emerald-400'>
+                    La nueva firma se guardará al pulsar `Actualizar`.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+          </div>
+
+          <div className='flex gap-3 justify-end'>
+            <Button type='button' variant='secondary' onClick={closeVehicleModal}>
+              {isVehicleReadOnlyMode ? 'Cerrar' : 'Cancelar'}
+            </Button>
+
+            {!isVehicleReadOnlyMode ? (
+              <Button type='submit' disabled={!hasVehicleEditChanges}>
+                {isVehicleSubmitting ? 'Guardando...' : 'Actualizar'}
+              </Button>
+            ) : null}
+          </div>
+        </form>
+      </Modal>
+    </>
   );
 }

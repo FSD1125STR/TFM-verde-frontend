@@ -1,5 +1,6 @@
 import { useContext, useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
+import Icon from '../components/ui/Icon';
 import Input from '../components/ui/Input';
 import Select from '../components/ui/Select';
 import Modal from '../components/ui/Modal';
@@ -48,6 +49,21 @@ function getStatusBadge(status) {
     : 'bg-white/10 text-white/60';
 }
 
+function normalizeEmployeeFormData(data) {
+  return {
+    name: (data.name ?? '').trim(),
+    lastname: (data.lastname ?? '').trim(),
+    email: (data.email ?? '').trim(),
+    role: data.role ?? '',
+    profile_image: data.profile_image
+      ? {
+          public_id: data.profile_image.public_id ?? '',
+          url: data.profile_image.url ?? '',
+        }
+      : null,
+  };
+}
+
 export default function EmployeePage() {
   const { profile } = useContext(LoginContext);
 
@@ -61,6 +77,8 @@ export default function EmployeePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingEmployeeId, setDeletingEmployeeId] = useState(null);
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [modalEmployeeSnapshot, setModalEmployeeSnapshot] = useState(null);
+  const [modalMode, setModalMode] = useState('create');
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('Todos');
@@ -134,8 +152,26 @@ export default function EmployeePage() {
     });
   }, [employees, search, roleFilter, statusFilter]);
 
+  const isReadOnlyMode = modalMode === 'view';
+  const isCreateMode = modalMode === 'create';
+
+  const applyEmployeeToForm = (employee) => {
+    setFormData({
+      name: employee.name ?? '',
+      lastname: employee.lastname ?? '',
+      email: employee.email ?? '',
+      password: '',
+      role: employee.rol ?? (roles.length > 0 ? roles[0] : ''),
+      profile_image: employee.profile_image ?? null,
+    });
+    setProfileImageFile(null);
+    setProfileImagePreview(employee.profile_image?.url ?? '');
+  };
+
   const openCreateModal = () => {
+    setModalMode('create');
     setEditingEmployee(null);
+    setModalEmployeeSnapshot(null);
     setIsModalOpen(true);
     setSubmitError('');
     setFormData({
@@ -151,24 +187,67 @@ export default function EmployeePage() {
   };
 
   const openEditModal = (employee) => {
+    setModalMode('edit');
     setEditingEmployee(employee);
+    setModalEmployeeSnapshot(employee);
     setIsModalOpen(true);
     setSubmitError('');
-    setFormData({
-      name: employee.name ?? '',
-      lastname: employee.lastname ?? '',
-      email: employee.email ?? '',
-      password: '',
-      role: employee.rol ?? (roles.length > 0 ? roles[0] : ''),
-      profile_image: employee.profile_image ?? null,
-    });
-    setProfileImageFile(null);
-    setProfileImagePreview(employee.profile_image?.url ?? '');
+    applyEmployeeToForm(employee);
   };
+
+  const openViewModal = (employee) => {
+    setModalMode('view');
+    setEditingEmployee(employee);
+    setModalEmployeeSnapshot(employee);
+    setIsModalOpen(true);
+    setSubmitError('');
+    applyEmployeeToForm(employee);
+  };
+
+  const toggleModalMode = () => {
+    if (!editingEmployee) return;
+
+    if (isReadOnlyMode) {
+      setModalMode('edit');
+      return;
+    }
+
+    if (modalEmployeeSnapshot) {
+      applyEmployeeToForm(modalEmployeeSnapshot);
+      setEditingEmployee(modalEmployeeSnapshot);
+    }
+
+    setSubmitError('');
+    setModalMode('view');
+  };
+
+  const hasEditChanges = useMemo(() => {
+    if (!editingEmployee || !modalEmployeeSnapshot) return false;
+
+    return (
+      JSON.stringify(normalizeEmployeeFormData(formData)) !==
+        JSON.stringify({
+          name: (modalEmployeeSnapshot.name ?? '').trim(),
+          lastname: (modalEmployeeSnapshot.lastname ?? '').trim(),
+          email: (modalEmployeeSnapshot.email ?? '').trim(),
+          role: modalEmployeeSnapshot.rol ?? '',
+          profile_image: modalEmployeeSnapshot.profile_image
+            ? {
+                public_id: modalEmployeeSnapshot.profile_image.public_id ?? '',
+                url: modalEmployeeSnapshot.profile_image.url ?? '',
+              }
+            : null,
+        }) ||
+      Boolean(profileImageFile) ||
+      Boolean(formData.password.trim())
+    );
+  }, [editingEmployee, formData, modalEmployeeSnapshot, profileImageFile]);
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setModalMode('create');
     setEditingEmployee(null);
+    setModalEmployeeSnapshot(null);
     setSubmitError('');
     setFormData({
       name: '',
@@ -253,6 +332,7 @@ export default function EmployeePage() {
             employee._id === editingEmployee._id ? updatedEmployee : employee,
           ),
         );
+        setModalEmployeeSnapshot(updatedEmployee);
       } else {
         const newEmployee = await createEmployee({
           ...payload,
@@ -441,8 +521,19 @@ export default function EmployeePage() {
                       </td>
 
                       <td className='px-6 py-4 text-right'>
-                        {profile.employee.rol === 'ADMIN' ? (
-                          <div className='flex flex-wrap justify-end gap-2'>
+                        <div className='flex flex-wrap justify-end gap-2'>
+                          <button
+                            type='button'
+                            onClick={() => openViewModal(employee)}
+                            className='flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:border-blue-500/40 hover:bg-white/5 hover:text-blue-300'
+                            aria-label='Ver empleado'
+                            title='Ver empleado'
+                          >
+                            <Icon name='eye' className='h-5 w-5' />
+                          </button>
+
+                          {profile.employee.rol === 'ADMIN' ? (
+                            <>
                             <Button
                               variant='secondary'
                               onClick={() => openEditModal(employee)}
@@ -458,8 +549,9 @@ export default function EmployeePage() {
                                 ? 'Eliminando...'
                                 : 'Eliminar'}
                             </Button>
-                          </div>
-                        ) : null}
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -478,12 +570,34 @@ export default function EmployeePage() {
 
       <Modal
         isOpen={isModalOpen}
-        title={editingEmployee ? 'Editar Empleado' : 'Nuevo Empleado'}
+        title={
+          isReadOnlyMode
+            ? 'Ver Empleado'
+            : editingEmployee
+              ? 'Editar Empleado'
+              : 'Nuevo Empleado'
+        }
         onClose={closeModal}
+        headerActions={
+          editingEmployee && profile.employee.rol === 'ADMIN' ? (
+            <button
+              type='button'
+              onClick={toggleModalMode}
+              className='flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white'
+              aria-label={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+              title={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+            >
+              <Icon
+                name={isReadOnlyMode ? 'pencil' : 'eye'}
+                className='h-4 w-4'
+              />
+            </button>
+          ) : null
+        }
         panelClassName='md:min-w-[60vw] max-w-6xl'
         bodyClassName='max-h-[80vh] overflow-y-auto'
       >
-        <form onSubmit={handleSubmitEmployee} className='space-y-5'>
+        <form onSubmit={isReadOnlyMode ? undefined : handleSubmitEmployee} className='space-y-5'>
           {submitError ? (
             <p className='text-sm text-red-400'>{submitError}</p>
           ) : null}
@@ -501,6 +615,7 @@ export default function EmployeePage() {
                     name='name'
                     value={formData.name}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -508,6 +623,7 @@ export default function EmployeePage() {
                     name='lastname'
                     value={formData.lastname}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -515,6 +631,7 @@ export default function EmployeePage() {
                     name='email'
                     value={formData.email}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -526,6 +643,7 @@ export default function EmployeePage() {
                     placeholder={
                       editingEmployee ? 'Déjalo vacío para mantener la actual' : ''
                     }
+                    readOnly={isReadOnlyMode}
                   />
                 </div>
               </div>
@@ -550,12 +668,14 @@ export default function EmployeePage() {
                     </div>
                   )}
 
-                  <input
-                    type='file'
-                    accept='image/*'
-                    onChange={handleProfileImageChange}
-                    className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
-                  />
+                  {!isReadOnlyMode ? (
+                    <input
+                      type='file'
+                      accept='image/*'
+                      onChange={handleProfileImageChange}
+                      className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
+                    />
+                  ) : null}
                 </div>
 
                 {rolesLoading ? (
@@ -567,8 +687,9 @@ export default function EmployeePage() {
                     label='Rol'
                     name='role'
                     value={formData.role}
-                    onChange={handleChange}
+                    onChange={isReadOnlyMode ? undefined : handleChange}
                     options={roleOptions}
+                    disabled={isReadOnlyMode}
                   />
                 )}
               </div>
@@ -577,16 +698,21 @@ export default function EmployeePage() {
 
           <div className='flex gap-3'>
             <Button type='button' variant='secondary' onClick={closeModal}>
-              Cancelar
+              {isReadOnlyMode ? 'Cerrar' : 'Cancelar'}
             </Button>
 
-            <Button type='submit'>
-              {isSubmitting
-                ? 'Guardando...'
-                : editingEmployee
-                  ? 'Actualizar'
-                  : 'Guardar'}
-            </Button>
+            {!isReadOnlyMode ? (
+              <Button
+                type='submit'
+                disabled={!isCreateMode && !hasEditChanges}
+              >
+                {isSubmitting
+                  ? 'Guardando...'
+                  : isCreateMode
+                    ? 'Guardar'
+                    : 'Actualizar'}
+              </Button>
+            ) : null}
           </div>
         </form>
       </Modal>
