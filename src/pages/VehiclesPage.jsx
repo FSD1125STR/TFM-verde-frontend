@@ -2,6 +2,7 @@ import { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Icon from '../components/ui/Icon';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/ui/PageHeader';
@@ -81,6 +82,20 @@ const emptyFormData = {
   observaciones: '',
 };
 
+function normalizeVehicleFormData(data) {
+  return {
+    client_id: data.client_id ?? '',
+    matricula: (data.matricula ?? '').trim(),
+    n_bastidor: (data.n_bastidor ?? '').trim(),
+    marca: (data.marca ?? '').trim(),
+    modelo: (data.modelo ?? '').trim(),
+    tipo_combustible: (data.tipo_combustible ?? '').trim(),
+    cantidad_combustible: String(data.cantidad_combustible ?? '0'),
+    year: String(data.year ?? '').trim(),
+    observaciones: (data.observaciones ?? '').trim(),
+  };
+}
+
 export default function VehiclesPage() {
   const { profile } = useContext(LoginContext);
   const signatureCanvasRef = useRef(null);
@@ -95,6 +110,8 @@ export default function VehiclesPage() {
   const [deletingVehicleId, setDeletingVehicleId] = useState(null);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [editingVehicle, setEditingVehicle] = useState(null);
+  const [modalVehicleSnapshot, setModalVehicleSnapshot] = useState(null);
+  const [modalMode, setModalMode] = useState('edit');
   const [isEvidenceModalOpen, setIsEvidenceModalOpen] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -142,13 +159,30 @@ export default function VehiclesPage() {
   }, [isModalOpen]);
 
   useEffect(() => {
+    const nextSearchParams = new URLSearchParams(searchParams);
+
     if (selectedCustomer === 'all') {
-      setSearchParams({});
-      return;
+      nextSearchParams.delete('customer');
+    } else {
+      nextSearchParams.set('customer', selectedCustomer);
     }
 
-    setSearchParams({ customer: selectedCustomer });
+    setSearchParams(nextSearchParams);
   }, [selectedCustomer, setSearchParams]);
+
+  useEffect(() => {
+    const requestedVehicleId = searchParams.get('vehicle');
+    if (!requestedVehicleId || vehicles.length === 0) return;
+
+    const requestedVehicle = vehicles.find((vehicle) => vehicle._id === requestedVehicleId);
+    if (!requestedVehicle) return;
+
+    openViewModal(requestedVehicle);
+
+    const nextSearchParams = new URLSearchParams(searchParams);
+    nextSearchParams.delete('vehicle');
+    setSearchParams(nextSearchParams);
+  }, [vehicles, searchParams, setSearchParams]);
 
   const customerOptions = [
     { value: 'all', label: 'Todos los clientes' },
@@ -186,6 +220,8 @@ export default function VehiclesPage() {
     });
   }, [vehicles, search, selectedCustomer]);
 
+  const isReadOnlyMode = modalMode === 'view';
+
   const hydrateEditModal = (vehicle) => {
     const normalizedVehicle = normalizeVehicleMedia(vehicle);
 
@@ -211,21 +247,29 @@ export default function VehiclesPage() {
     clearSignatureCanvas();
   };
 
-  const openEditModal = async (vehicle) => {
+  const openVehicleModal = async (vehicle, mode = 'edit') => {
+    setModalMode(mode);
     setIsModalOpen(true);
 
     hydrateEditModal(vehicle);
+    setModalVehicleSnapshot(normalizeVehicleMedia(vehicle));
     setIsLoadingVehicleDetail(true);
 
     try {
       const vehicleDetail = await getVehicleById(vehicle._id);
-      hydrateEditModal(vehicleDetail);
+      const normalizedVehicleDetail = normalizeVehicleMedia(vehicleDetail);
+      setModalVehicleSnapshot(normalizedVehicleDetail);
+      hydrateEditModal(normalizedVehicleDetail);
     } catch (error) {
       setSubmitError(error.message);
     } finally {
       setIsLoadingVehicleDetail(false);
     }
   };
+
+  const openEditModal = (vehicle) => openVehicleModal(vehicle, 'edit');
+
+  const openViewModal = (vehicle) => openVehicleModal(vehicle, 'view');
 
   const openEvidenceModal = async (vehicle) => {
     setIsEvidenceModalOpen(true);
@@ -246,6 +290,8 @@ export default function VehiclesPage() {
 
   const closeModal = () => {
     setEditingVehicle(null);
+    setModalVehicleSnapshot(null);
+    setModalMode('edit');
     setSubmitError('');
     setFormData(emptyFormData);
     setReceptionImages([]);
@@ -255,6 +301,59 @@ export default function VehiclesPage() {
     clearSignatureCanvas();
     setIsModalOpen(false);
   };
+
+  const toggleModalMode = () => {
+    if (!editingVehicle) return;
+
+    if (isReadOnlyMode) {
+      setModalMode('edit');
+      return;
+    }
+
+    if (modalVehicleSnapshot) {
+      hydrateEditModal(modalVehicleSnapshot);
+    }
+
+    setSubmitError('');
+    setModalMode('view');
+  };
+
+  const hasEditChanges = useMemo(() => {
+    if (!editingVehicle || !modalVehicleSnapshot) return false;
+
+    const snapshotFormData = {
+      client_id: modalVehicleSnapshot.client_id?._id ?? '',
+      matricula: modalVehicleSnapshot.matricula ?? '',
+      n_bastidor: modalVehicleSnapshot.n_bastidor ?? '',
+      marca: modalVehicleSnapshot.marca ?? '',
+      modelo: modalVehicleSnapshot.modelo ?? '',
+      tipo_combustible: modalVehicleSnapshot.tipo_combustible ?? '',
+      cantidad_combustible: String(modalVehicleSnapshot.cantidad_combustible ?? 0),
+      year: modalVehicleSnapshot.year
+        ? new Date(modalVehicleSnapshot.year).getFullYear().toString()
+        : '',
+      observaciones: modalVehicleSnapshot.observaciones ?? '',
+    };
+
+    return (
+      JSON.stringify(normalizeVehicleFormData(formData)) !==
+        JSON.stringify(normalizeVehicleFormData(snapshotFormData)) ||
+      newReceptionFiles.length > 0 ||
+      hasNewSignature ||
+      JSON.stringify(receptionImages) !==
+        JSON.stringify(modalVehicleSnapshot.reception_images ?? []) ||
+      JSON.stringify(signatureImage) !==
+        JSON.stringify(modalVehicleSnapshot.customer_signature ?? null)
+    );
+  }, [
+    editingVehicle,
+    formData,
+    hasNewSignature,
+    modalVehicleSnapshot,
+    newReceptionFiles.length,
+    receptionImages,
+    signatureImage,
+  ]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -426,7 +525,7 @@ export default function VehiclesPage() {
             : vehicle,
         ),
       );
-      setSignatureImage(nextSignature);
+      setModalVehicleSnapshot(normalizeVehicleMedia(updatedVehicle));
       closeModal();
     } catch (error) {
       setSubmitError(error.message);
@@ -575,9 +674,6 @@ export default function VehiclesPage() {
                               </p>
                             </div>
 
-                            <div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-600/15 text-blue-300'>
-                              →
-                            </div>
                           </div>
                         </button>
                       </td>
@@ -589,25 +685,37 @@ export default function VehiclesPage() {
                       </td>
 
                       <td className='px-6 py-4 text-right'>
-                        {profile.employee.rol === 'ADMIN' ? (
-                          <div className='flex justify-end gap-2'>
-                            <Button
-                              variant='secondary'
-                              onClick={() => openEditModal(vehicle)}
-                            >
-                              Editar
-                            </Button>
+                        <div className='flex justify-end gap-2'>
+                          <button
+                            type='button'
+                            onClick={() => openViewModal(vehicle)}
+                            className='flex h-11 w-11 items-center justify-center rounded-xl border border-white/10 text-white/70 transition hover:border-blue-500/40 hover:bg-white/5 hover:text-blue-300'
+                            aria-label='Ver vehículo'
+                            title='Ver vehículo'
+                          >
+                            <Icon name='eye' className='h-5 w-5' />
+                          </button>
 
-                            <Button
-                              variant='ghost'
-                              onClick={() => handleDeleteVehicle(vehicle._id)}
-                            >
-                              {deletingVehicleId === vehicle._id
-                                ? 'Eliminando...'
-                                : 'Eliminar'}
-                            </Button>
-                          </div>
-                        ) : null}
+                          {profile.employee.rol === 'ADMIN' ? (
+                            <>
+                              <Button
+                                variant='secondary'
+                                onClick={() => openEditModal(vehicle)}
+                              >
+                                Editar
+                              </Button>
+
+                              <Button
+                                variant='ghost'
+                                onClick={() => handleDeleteVehicle(vehicle._id)}
+                              >
+                                {deletingVehicleId === vehicle._id
+                                  ? 'Eliminando...'
+                                  : 'Eliminar'}
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -702,12 +810,28 @@ export default function VehiclesPage() {
 
       <Modal
         isOpen={isModalOpen}
-        title='Editar Vehiculo'
+        title={isReadOnlyMode ? 'Ver Vehiculo' : 'Editar Vehiculo'}
         onClose={closeModal}
+        headerActions={
+          editingVehicle && profile.employee.rol === 'ADMIN' ? (
+            <button
+              type='button'
+              onClick={toggleModalMode}
+              className='flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/70 transition hover:bg-white/10 hover:text-white'
+              aria-label={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+              title={isReadOnlyMode ? 'Pasar a edición' : 'Pasar a vista'}
+            >
+              <Icon
+                name={isReadOnlyMode ? 'pencil' : 'eye'}
+                className='h-4 w-4'
+              />
+            </button>
+          ) : null
+        }
         panelClassName='md:min-w-[50vw] max-w-6xl'
         bodyClassName='max-h-[80vh] overflow-y-auto'
       >
-        <form onSubmit={handleSubmitVehicle} className='space-y-6'>
+        <form onSubmit={isReadOnlyMode ? undefined : handleSubmitVehicle} className='space-y-6'>
           {isLoadingVehicleDetail ? (
             <p className='text-sm text-white/50'>
               Cargando datos completos del vehículo...
@@ -730,8 +854,9 @@ export default function VehiclesPage() {
                     label='Cliente'
                     name='client_id'
                     value={formData.client_id}
-                    onChange={handleChange}
+                    onChange={isReadOnlyMode ? undefined : handleChange}
                     options={formCustomerOptions}
+                    disabled={isReadOnlyMode}
                   />
 
                   <Input
@@ -739,6 +864,7 @@ export default function VehiclesPage() {
                     name='matricula'
                     value={formData.matricula}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -746,6 +872,7 @@ export default function VehiclesPage() {
                     name='marca'
                     value={formData.marca}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -753,6 +880,7 @@ export default function VehiclesPage() {
                     name='modelo'
                     value={formData.modelo}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -760,13 +888,14 @@ export default function VehiclesPage() {
                     name='tipo_combustible'
                     value={formData.tipo_combustible}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Select
                     label='Nivel combustible'
                     name='cantidad_combustible'
                     value={formData.cantidad_combustible}
-                    onChange={handleChange}
+                    onChange={isReadOnlyMode ? undefined : handleChange}
                     options={[
                       { value: '0', label: 'Vacio' },
                       { value: '1', label: '1/4' },
@@ -774,6 +903,7 @@ export default function VehiclesPage() {
                       { value: '3', label: '3/4' },
                       { value: '4', label: 'Lleno' },
                     ]}
+                    disabled={isReadOnlyMode}
                   />
 
                   <Input
@@ -781,6 +911,7 @@ export default function VehiclesPage() {
                     name='n_bastidor'
                     value={formData.n_bastidor}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
 
                   <Input
@@ -788,6 +919,7 @@ export default function VehiclesPage() {
                     name='year'
                     value={formData.year}
                     onChange={handleChange}
+                    readOnly={isReadOnlyMode}
                   />
                 </div>
               </div>
@@ -799,8 +931,9 @@ export default function VehiclesPage() {
                 <textarea
                   name='observaciones'
                   value={formData.observaciones}
-                  onChange={handleChange}
-                  className='w-full h-32 rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5 text-white resize-none'
+                  onChange={isReadOnlyMode ? undefined : handleChange}
+                  readOnly={isReadOnlyMode}
+                  className='w-full h-32 rounded-2xl bg-[#1F2937] px-4 py-3 outline-none border border-white/5 text-white resize-none read-only:text-white/70'
                 />
               </div>
             </div>
@@ -824,27 +957,31 @@ export default function VehiclesPage() {
                           alt='Recepcion'
                           className='h-28 w-full rounded-xl object-cover border border-white/10'
                         />
-                        <button
-                          type='button'
-                          onClick={() => handleRemoveReceptionImage(image)}
-                          className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
-                        >
-                          x
-                        </button>
+                        {!isReadOnlyMode ? (
+                          <button
+                            type='button'
+                            onClick={() => handleRemoveReceptionImage(image)}
+                            className='absolute -top-2 -right-2 h-6 w-6 rounded-full bg-red-500 text-white text-xs'
+                          >
+                            x
+                          </button>
+                        ) : null}
                       </div>
                     ))}
                   </div>
                 )}
 
-                <input
-                  type='file'
-                  multiple
-                  accept='image/*'
-                  onChange={handleReceptionFilesChange}
-                  className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
-                />
+                {!isReadOnlyMode ? (
+                  <input
+                    type='file'
+                    multiple
+                    accept='image/*'
+                    onChange={handleReceptionFilesChange}
+                    className='w-full rounded-2xl bg-[#1F2937] px-4 py-3 border border-white/5 text-white'
+                  />
+                ) : null}
 
-                {newReceptionFiles.length > 0 ? (
+                {!isReadOnlyMode && newReceptionFiles.length > 0 ? (
                   <p className='text-xs text-white/50'>
                     {newReceptionFiles.length} archivo(s) listo(s) para subir.
                   </p>
@@ -863,44 +1000,50 @@ export default function VehiclesPage() {
                       alt='Firma'
                       className='h-28 w-full rounded-xl object-contain border border-white/10 p-2'
                     />
-                    <p className='text-xs text-white/50'>
-                      Dibuja una nueva firma en el canvas para reemplazar la
-                      actual al guardar.
-                    </p>
+                    {!isReadOnlyMode ? (
+                      <p className='text-xs text-white/50'>
+                        Dibuja una nueva firma en el canvas para reemplazar la
+                        actual al guardar.
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <p className='text-sm text-white/50'>
-                    No hay firma guardada. Puedes dibujarla abajo.
+                    {isReadOnlyMode
+                      ? 'No hay firma guardada.'
+                      : 'No hay firma guardada. Puedes dibujarla abajo.'}
                   </p>
                 )}
 
-                <div className='flex justify-end'>
-                  <button
-                    type='button'
-                    onClick={clearSignatureCanvas}
-                    className='px-3 py-2 rounded-xl bg-[#1F2937] text-xs text-white/70 hover:text-white'
-                  >
-                    Limpiar firma
-                  </button>
-                </div>
+                {!isReadOnlyMode ? (
+                  <div className='flex justify-end'>
+                    <button
+                      type='button'
+                      onClick={clearSignatureCanvas}
+                      className='px-3 py-2 rounded-xl bg-[#1F2937] text-xs text-white/70 hover:text-white'
+                    >
+                      Limpiar firma
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className='rounded-2xl border border-white/10 bg-[#172033] p-3'>
                   <canvas
                     ref={signatureCanvasRef}
                     width={700}
                     height={180}
-                    className='w-full h-[180px] rounded-xl cursor-crosshair'
-                    onMouseDown={startSignatureDrawing}
-                    onMouseMove={drawSignature}
-                    onMouseUp={stopSignatureDrawing}
-                    onMouseLeave={stopSignatureDrawing}
-                    onTouchStart={startSignatureDrawing}
-                    onTouchMove={drawSignature}
-                    onTouchEnd={stopSignatureDrawing}
+                    className={`w-full h-[180px] rounded-xl ${isReadOnlyMode ? '' : 'cursor-crosshair'}`}
+                    onMouseDown={isReadOnlyMode ? undefined : startSignatureDrawing}
+                    onMouseMove={isReadOnlyMode ? undefined : drawSignature}
+                    onMouseUp={isReadOnlyMode ? undefined : stopSignatureDrawing}
+                    onMouseLeave={isReadOnlyMode ? undefined : stopSignatureDrawing}
+                    onTouchStart={isReadOnlyMode ? undefined : startSignatureDrawing}
+                    onTouchMove={isReadOnlyMode ? undefined : drawSignature}
+                    onTouchEnd={isReadOnlyMode ? undefined : stopSignatureDrawing}
                   />
                 </div>
 
-                {hasNewSignature ? (
+                {!isReadOnlyMode && hasNewSignature ? (
                   <p className='text-xs text-emerald-400'>
                     La nueva firma se guardará al pulsar `Actualizar`.
                   </p>
@@ -911,12 +1054,14 @@ export default function VehiclesPage() {
 
           <div className='flex gap-3 justify-end'>
             <Button type='button' variant='secondary' onClick={closeModal}>
-              Cancelar
+              {isReadOnlyMode ? 'Cerrar' : 'Cancelar'}
             </Button>
 
-            <Button type='submit'>
-              {isSubmitting ? 'Guardando...' : 'Actualizar'}
-            </Button>
+            {!isReadOnlyMode ? (
+              <Button type='submit' disabled={!hasEditChanges}>
+                {isSubmitting ? 'Guardando...' : 'Actualizar'}
+              </Button>
+            ) : null}
           </div>
         </form>
       </Modal>

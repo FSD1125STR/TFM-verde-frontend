@@ -84,6 +84,18 @@ export default function Icon({ name, className = 'h-5 w-5' }) {
         <circle cx='12' cy='13' r='3.5' />
       </svg>
     ),
+    eye: (
+      <svg {...iconProps}>
+        <path d='M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z' />
+        <circle cx='12' cy='12' r='3' />
+      </svg>
+    ),
+    pencil: (
+      <svg {...iconProps}>
+        <path d='M4 20h4l10-10a2.1 2.1 0 0 0-4-4L4 16v4Z' />
+        <path d='m13.5 6.5 4 4' />
+      </svg>
+    ),
     download: (
       <svg {...iconProps}>
         <path d='M12 3v12' />
